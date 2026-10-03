@@ -1,15 +1,3 @@
-<!--
-SYNC IMPACT REPORT — temporary review material, removed before commit.
-Initial ratification (no prior version).
-- Version change: none → 1.0.0
-- Principles: 10 established (I–X). Mapping to the handoff's constitution suggestions
-  (docs/04 §Constitution suggestions): I←2, II←1, III←3, IV←4, V←7, VI←6, VII←8,
-  VIII←5, IX←9, X←10.
-- Added sections: Additional Constraints; Development Workflow & Quality Gates; Governance.
-- Removed sections: none.
-- Deferred TODOs: none (ratification date known: 2026-10-03).
--->
-
 # Understudy Constitution
 
 ## Core Principles
