@@ -41,7 +41,7 @@
           "type": "string",
           "pattern": "^/",
           "default": "/__understudy",
-          "description": "Reserved prefix. A request here is never routed into the mocked surface."
+          "description": "Reserved prefix. A request here is never routed into the mocked surface. Composed as prefix + path, so it carries no trailing slash."
         },
         "port": {
           "type": "integer",
@@ -56,7 +56,12 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "driver": { "type": "string", "enum": ["sqlite"], "default": "sqlite" },
+        "driver": {
+          "type": "string",
+          "enum": ["sqlite", "postgres"],
+          "default": "sqlite",
+          "description": "Reserved for a later slice: only 'sqlite' is implemented. 'postgres' is accepted by the schema so the shape is stable before the feature lands; selecting it refuses to start with a clear message until the adapter exists."
+        },
         "path": {
           "type": "string",
           "default": "./.understudy/state.db",
@@ -73,6 +78,24 @@
           "default": 100000,
           "description": "First identity for records created over the API. Reserved range: it must not overlap identities that fixtures will declare in slice 2."
         }
+      }
+    },
+    "signing": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "RESERVED — accepted by the schema so the shape is stable, but not read in this slice. Webhook HMAC signing lands with the webhook slices; algorithm, header name and signed-content template will all be configurable. Setting it has no effect yet.",
+      "properties": {
+        "alg": { "type": "string", "default": "hmac-sha256" },
+        "header": { "type": "string", "default": "X-Signature" }
+      }
+    },
+    "clock": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "RESERVED — accepted by the schema so the shape is stable, but not read in this slice. A virtual clock (fast-forward for time-dependent scenarios) is a later slice; until then the tool uses the real clock and reports that it does.",
+      "properties": {
+        "mode": { "type": "string", "enum": ["real", "virtual"], "default": "real" },
+        "start": { "type": "string", "format": "date-time" }
       }
     }
   }

@@ -142,9 +142,12 @@ human can act on.
   meaningful and match declared behaviour (a merge with nothing to merge versus an explicit clear).
 - **PUT against a record that does not exist**: answered per the document (create or not-found),
   not by guessing.
-- **DELETE of a record referenced by another record**: the answer is whatever configuration says
-  for that relationship (restrict → conflict, cascade, or set-null), and the message names the
-  relationship.
+- ~~**DELETE of a record referenced by another record**~~ **Deferred to slice 2.** Slice 1
+  derives relationships only to report them and enforces no foreign keys (see `data-model.md`
+  → "Deliberately absent"), so a delete cannot be refused for a reference. Slice 2 adds
+  constraints with generation, where orphans become possible; the behaviour then is whatever
+  configuration says for that relationship (restrict → conflict, cascade, or set-null), and the
+  message names the relationship.
 - **A record is deleted twice**: the second answer identifies it as missing; the store is not
   corrupted.
 - **Concurrent create/list traffic**: list results do not show half-written records.
@@ -207,7 +210,9 @@ human can act on.
 - **FR-013**: The control surface MUST report health, including whether the underlying store is
   reachable.
 - **FR-014**: The control surface MUST reset the mock. Slice 1 MUST support a full wipe removing
-  all data written over the mock's API while leaving the mock running and answering.
+  all data written over the mock's API while leaving the mock running and answering. The wipe
+  MAY be scoped to a subset of entities named in the request; an unscoped wipe removes
+  everything.
 - **FR-015**: The control surface MUST list the operations that are live and those that are not.
 - **FR-016**: The control surface MUST record the requests that arrived and MUST serve that log
   with filtering.
@@ -219,8 +224,10 @@ human can act on.
 **Command line**
 
 - **FR-019**: A command-line client MUST offer every slice-1 control capability — start, stop,
-  reset, list operations — and MUST contain **no logic the control surface does not have**: each
-  command is a client of the control surface.
+  reset, list operations, and read the request log — and MUST contain **no logic the control
+  surface does not have**: each command is a client of the control surface. The enumeration
+  here is exhaustive for slice 1: a capability the control surface gains in a later slice
+  obliges the CLI to expose it too.
 - **FR-020**: The command line MUST accept the operation selection at start, and the configuration
   file path, as arguments or environment, with no absolute host paths baked into shipped code.
 
@@ -310,6 +317,52 @@ human can act on.
 - **Out of scope for slice 1** (explicitly): data generation and configuration layers, import and
   export, snapshots, events and webhooks, actions and simulation, webhook signing, a virtual
   clock, tenant scoping, GraphQL/gRPC/SOAP, and any GUI.
+- **One recorded deviation from the handoff.** `docs/01` FR-006 writes the default reserved prefix
+  with a trailing slash (`/__understudy/`); this spec's default is `/__understudy`, without one.
+  The prefix is composed as `prefix + path`, so a trailing slash would produce
+  `/__understudy//health`. `docs/02`, `docs/03` and `docs/04` all use the no-slash form, making
+  `docs/01` the outlier; the no-slash form is adopted deliberately, and this note is the record
+  of the deviation rather than a silent divergence from the source material.
+
+## Traceability: handoff FR numbering → this specification
+
+`docs/01-product-spec.md` numbers the product's requirements FR-001…FR-023. This specification
+introduces its own FR-001…FR-024, and the two ranges **overlap while meaning different things** —
+so the same identifier cannot be read across the two documents without this table. It is the
+auditable record of what slice 1 carried, narrowed, or deferred.
+
+| `docs/01` | Slice 1 status | This spec |
+|---|---|---|
+| FR-001 Load 3.0/3.1, resolve `$ref`s | carried | FR-001 |
+| FR-002 Enable by `operationId` or `METHOD /path`; others 501 | carried | FR-002, FR-003 |
+| FR-003 Validate requests and responses | carried | FR-008, FR-009 |
+| FR-004 Generic CRUD with spec-defined status codes | carried | FR-005, FR-006 |
+| FR-005 Persist in SQLite behind an interface | carried | FR-010 (+ `Store` seam, `plan.md`) |
+| FR-006 Control API under a reserved prefix | **narrowed** to health/reset/operations/requests/teardown | FR-012–FR-018 |
+| FR-007 CLI wrapping the control API | carried | FR-019, FR-020 |
+| FR-008 Separate static/dynamic/imports/behaviour config | deferred (config *shape* only) | Assumptions; slice 2 |
+| FR-009 Tag every row with `origin` | carried as a seam, one origin in use | Assumptions; `data-model.md` §2 |
+| FR-010 Field precedence chain and FK inference | deferred | slice 2 (`specs/002-data-layer`) |
+| FR-011 Absolute and per-parent counts | deferred | slice 2 |
+| FR-012 Deterministic generation from a seed | deferred | slice 2 |
+| FR-013 Reserved identity ranges per entity | **partly carried** — reservation now, fixture overlap checks in slice 2 | FR-011 |
+| FR-014 Mapping-file import, export by origin | deferred | slice 3 |
+| FR-015 Emit domain events | deferred | slice 4 |
+| FR-016 Webhook targets, subscriptions, templates, retries | deferred | slice 4 |
+| FR-017 Webhook fault injection | deferred | slice 6 |
+| FR-018 Actions with typed params and steps | deferred | slice 5 |
+| FR-019 Action triggers | deferred | slice 5 |
+| FR-020 `writes: actions-only` entities | deferred | slice 5 |
+| FR-021 Reset modes: baseline, runtime-only, wipe, per-entity | **narrowed** to wipe (entity-scoping optional) | FR-014 |
+| FR-022 Request log with filtering | carried | FR-016 |
+| FR-023 Webhook HMAC signing | deferred | slice 6 |
+
+**FRs in this spec with no `docs/01` counterpart** — these are requirements slice 1 needs that the
+handoff states only in prose or not at all: FR-004 (refuse to start on an unusable document or
+selection), FR-007 (list parameter handling), FR-011 (identity allocation), FR-017 (idempotent
+teardown), FR-018 (the control plane describes itself), FR-021, FR-023 and FR-024 (the startup
+report and structured logging). They are traceable to the spec's own edge cases and to
+constitution principle VI.
 
 ## Dependencies
 

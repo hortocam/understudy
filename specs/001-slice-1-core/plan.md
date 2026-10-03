@@ -71,11 +71,22 @@ operations; thousands of records per collection without exhausting memory (paged
 | VI. Explicit over magic | Every inference reported at startup and pinnable | **PASS** — FR-023/FR-024 make the startup report a deliverable; the derivation rules below pin exactly what is inferred and what is refused |
 | VII. Test-first, contract-verified | Failing test first; golden files; conformance in CI | **PASS by process** — every task in `tasks.md` is written test-first; the contract suite is a slice-1 deliverable (SC-003) |
 | VIII. Safe and portable | No hidden outbound calls; secrets from env; portable | **PASS** — FR-022 forbids outbound calls beyond a URL spec; slice 1 has no credentials at all |
-| IX. Small, documented config surface | Every key documented with an example | **PASS** — five config keys (`contracts/config.schema.yaml`), each documented and exemplified in `quickstart.md` |
-| X. Additive evolution | Seams exist before the features that use them | **PASS** — the `Store` interface and the reset-mode parameter both land now with one implementation/value |
+| IX. Small, documented config surface | Every key documented with an example; future keys reserved | **PASS (corrected — see below)** — each *implemented* key is documented and exemplified in `quickstart.md`; `signing`, `clock` and `storage.driver: postgres` are reserved in the schema so the shape is stable before their features land |
+| X. Additive evolution | Seams exist before the features that use them | **PASS** — the `Store` interface, the reset-mode parameter, and the three reserved config keys all land now with one implementation/value |
 
 **Post-Phase-1 re-check**: unchanged. The design adds no abstraction that isn't a named seam from
 principle X, and invents no behaviour the spec does not require.
+
+**Correction (independent review, 2026-10-03).** The Principle IX row first read "PASS — five config
+keys, each documented", which was wrong: principle IX requires *future* keys to be **reserved**
+(`signing`, `clock`, `storage.driver: postgres`, relationship `onDelete`) so the shape is stable
+before the feature lands. The initial schema offered only `storage.driver: ["sqlite"]`, which
+locks the door from the wrong side — adding Postgres would have been a schema change on every
+consumer config. The reviewer caught it; the schema now reserves those keys and `storage.driver`
+accepts `postgres` (refusing to start with a named message until the adapter exists, because a
+config key that silently does nothing is worse than one that does not exist). Relationship
+`onDelete` arrives with the `entities:` block in slice 2, where relationships first become
+concrete — reserving a shape for a key that has no object to hang from yet would be noise.
 
 ## Project Structure
 
@@ -89,6 +100,7 @@ specs/001-slice-1-core/
 ├── data-model.md        # Phase 1: entities, tables, derivation rules
 ├── quickstart.md        # Phase 1: runnable validation scenarios
 ├── contracts/           # Phase 1: the interfaces this feature exposes
+│   ├── README.md                      # why the control contract is checked in, not generated
 │   ├── control-api.openapi.yaml
 │   ├── config.schema.yaml
 │   └── cli.md

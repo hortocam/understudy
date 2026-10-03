@@ -38,14 +38,32 @@ ids:     { generatedStart: 100000 }
 
 ## 3. Start it
 
+Time this step: from a clean checkout, **`npm ci` → first successful response must be under
+5 minutes** (SC-001). Note the wall-clock start before §1 and the time the mock answers in §4.
+
 ```bash
 npx ustdy up --config ./understudy.yaml
 ```
 
-**Expected**: the process prints the startup report and starts serving. The report names the five
-live operations, the not-selected ones, the derived resource (`Inventory`), its identity field and
-its inferred relationships **with the evidence for each**, and any ambiguity. Nothing about the
-run is silent.
+**Expected**: the process prints the startup report and starts serving. The report must name, each
+on its own line and machine-checkably (SC-006):
+
+- **every live operation** — the five from the config, by method and path;
+- **every not-selected operation** — including the deliberately-unselected one in the fixture;
+- **every derived resource**, with its identity field and identity type;
+- **every inferred relationship with its evidence source**, rendered so a `convention`-sourced
+  link is distinguishable from a `configured` one;
+- **every ambiguity** — a path that matched no resource, an operation with no declared 2xx schema,
+  a document with no declared list parameters.
+
+```bash
+# The report is also emitted as one structured log line; assert the parts are present
+# rather than reading the prose by eye. Adjust the field names to the shipped schema.
+npx ustdy up --config ./understudy.yaml --log-json 2>&1 | head -1 | jq -e \
+  '.report.live | length == 5' \
+  && echo "SC-006: report carries the live set"
+```
+
 
 ## 4. Prove CRUD persists across a restart (SC-002, FR-010)
 

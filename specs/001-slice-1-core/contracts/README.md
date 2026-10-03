@@ -20,27 +20,16 @@ and is not regenerated from the tests.
 
 ## Error semantics
 
-Every control operation answers a JSON body. A malformed control request is `400` with a body
-naming the offending field. A request under the reserved prefix that is **not** a control operation
-is `404` with `unknown control operation` — never routed into the mocked surface (spec edge case).
+Every control operation answers a JSON body. A malformed control request is `400` with a
+`ControlError` body naming the offending field. A request under the reserved prefix that is **not**
+a control operation is `404` with `error: unknown_control_operation` — never routed into the
+mocked surface. Both are declared in `control-api.openapi.yaml`, so a consumer generating a client
+from the served document knows they exist.
 
-## The mocked surface's not-implemented answer
+## Reserved keys in the config schema
 
-Where the control plane's 404 distinguishes "no such control operation", the *mocked* surface's 501
-distinguishes "this operation exists in your document but is not enabled in this mock". The two
-must never be the same status (FR-003, SC-004) — which is why the mocked surface's
-not-implemented answer is **501**, not a 404.
-
-## The CLI's mapping (FR-019)
-
-| Command | Control call | Notes |
-|---|---|---|
-| `ustdy up [--config] [--port] [--control-port]` | none (starts the mock in-process, then polls `/health`) | the only command that is not purely a client: something has to start the server. It performs no engine work — it constructs the server from the config and hands off |
-| `ustdy ops list` | `GET /operations` | formats both sets |
-| `ustdy ops enable/disable <op…>` | `PATCH /operations` | **slice 2+**; not in slice 1 |
-| `ustdy reset [--to wipe] [--entity <name>]` | `POST /reset` | slice 1 implements `wipe` only |
-| `ustdy logs requests [--method] [--status] [--limit]` | `GET /requests` | slice 1's only log type |
-| `ustdy down` | `POST /teardown` | reports success once the port is released |
-
-Any command whose behaviour cannot be expressed as "call this control operation, format the
-answer" is out of scope for the CLI by definition and belongs in the control API instead.
+`signing`, `clock` and `storage.driver: postgres` are present in `config.schema.yaml` and
+explicitly documented there as **reserved** — accepted so the config's shape is stable before the
+features land (constitution IX and X). Selecting an unimplemented value is a startup refusal with
+a message naming it, not a silent no-op: a config key that quietly does nothing is worse than one
+that does not exist.

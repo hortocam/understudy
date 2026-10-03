@@ -5,6 +5,14 @@ info:
   description: >
     Control surface for a running understudy mock. Every capability of the tool is reachable
     here; the CLI is a client of this API and adds no logic of its own.
+  x-served-source: >
+    This document is a CHECKED-IN artefact, not generated from the implementation. The running
+    control plane serves it byte-identical; a test asserts that (a drift check). If a served
+    description were generated from the code it could never disagree with the implementation,
+    which is the opposite of a contract.
+  x-prefix: >
+    Every path below is relative to the configured reserved prefix (default /__understudy).
+    The prefix is composed as prefix + path and carries no trailing slash.
 paths:
   /health:
     get:
@@ -32,6 +40,8 @@ paths:
                         type: string
                       error:
                         type: string
+        "500":
+          $ref: "#/components/responses/InternalError"
   /operations:
     get:
       operationId: listOperations
@@ -53,6 +63,8 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/OperationRef"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /reset:
     post:
       operationId: reset
@@ -91,6 +103,10 @@ paths:
                     additionalProperties:
                       type: integer
                     description: Rows removed, keyed by entity name.
+        "400":
+          $ref: "#/components/responses/MalformedRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /requests:
     get:
       operationId: listRequests
@@ -132,13 +148,27 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/RequestLogEntry"
+        "400":
+          $ref: "#/components/responses/MalformedRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /openapi.json:
     get:
       operationId: getControlDocument
       summary: This document
+      description: >
+        Serves the checked-in control-API contract byte-identical. Declared here as
+        application/json carrying an OpenAPI document, so a consumer can fetch it and generate
+        a client without a second out-of-band source.
       responses:
         "200":
           description: The control API's own OpenAPI document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenApiDocument"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /teardown:
     post:
       operationId: teardown
@@ -157,8 +187,61 @@ paths:
                 properties:
                   ok:
                     type: boolean
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /{unknown}:
+    get:
+      operationId: unknownControlOperation
+      summary: Any other path under the reserved prefix
+      description: >
+        A request under the reserved prefix that is not a control operation is answered as an
+        unknown CONTROL operation and is never routed into the mocked surface. This entry is
+        documentation for that behaviour; it is not a route the mocked surface can shadow.
+      parameters:
+        - name: unknown
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "404":
+          $ref: "#/components/responses/UnknownControlOperation"
+        "500":
+          $ref: "#/components/responses/InternalError"
 components:
+  responses:
+    MalformedRequest:
+      description: The request body or parameters could not be read
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ControlError"
+    UnknownControlOperation:
+      description: No such control operation under the reserved prefix
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ControlError"
+    InternalError:
+      description: The control operation failed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ControlError"
   schemas:
+    ControlError:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          description: A stable short code, e.g. malformed_request or unknown_control_operation.
+        message:
+          type: string
+          description: Human-readable, and names the offending field or path.
+        field:
+          type: string
+          description: The offending input, when the error is attributable to one.
     OperationRef:
       type: object
       required: [method, path]
@@ -188,3 +271,18 @@ components:
           type: boolean
         durationMs:
           type: integer
+    OpenApiDocument:
+      type: object
+      description: >
+        An OpenAPI 3.1 document. Declared permissively: describing the full OpenAPI meta-schema
+        here would be a second copy of it, and a copy that can go stale is worse than a
+        permissive reference to the real one.
+      required: [openapi, info, paths]
+      properties:
+        openapi:
+          type: string
+        info:
+          type: object
+        paths:
+          type: object
+      additionalProperties: true

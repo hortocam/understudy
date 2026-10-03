@@ -106,7 +106,10 @@ create a record, restart the process, read it back; call a non-selected operatio
       and asserts every response against `tests/fixtures/inventory-api.yaml` — the SC-003 suite.
       Fails first.
 - [ ] T020 [P] [US1] Integration test in `tests/integration/persistence.test.ts`: create → restart
-      the process → read back (SC-002). Fails first.
+      the process → read back (SC-002). Fails first. Also assert the machine-checked form of
+      constitution IV: after a full CRUD workout, **every** row in the SQLite file has
+      `origin='runtime'` — the CHECK constraint alone permits all four values, so the invariant
+      needs a test, not a comment.
 - [ ] T021 [P] [US1] Integration test in `tests/integration/not-implemented.test.ts`: a
       non-selected operation returns 501 with the operation named, and 501 ≠ the not-found status
       (SC-004). Fails first.
@@ -140,8 +143,9 @@ create a record, restart the process, read it back; call a non-selected operatio
 - [ ] T028 [P] [US2] Integration test in `tests/integration/control.test.ts` for `quickstart.md`
       §7: health reports store reachability; reset wipes and leaves the mock answering; operations
       lists both sets; requests filters; teardown releases the port; a **second** teardown is not
-      destructive; an unknown control path under the prefix returns the control 404 and never
-      reaches the mocked surface (SC-002, FR-012–FR-017). Fails first.
+      destructive; an unknown control path under the prefix returns the control 404 **with the
+      declared `ControlError` body** and never reaches the mocked surface; a malformed reset body
+      returns the declared 400 `ControlError` (SC-002, FR-012–FR-017). Fails first.
 - [ ] T029 [US2] Implement `src/control/routes.ts`: the five operations of
       `contracts/control-api.openapi.yaml`, each answering exactly the documented shape.
 - [ ] T030 [US2] Implement `src/control/openapi.ts`: serve `contracts/control-api.openapi.yaml` at
