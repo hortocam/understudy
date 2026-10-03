@@ -1,0 +1,190 @@
+openapi: 3.1.0
+info:
+  title: Understudy Control API
+  version: 0.1.0
+  description: >
+    Control surface for a running understudy mock. Every capability of the tool is reachable
+    here; the CLI is a client of this API and adds no logic of its own.
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Liveness and store reachability
+      responses:
+        "200":
+          description: The mock is alive
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, store]
+                properties:
+                  status:
+                    type: string
+                    const: ok
+                  store:
+                    type: object
+                    required: [reachable]
+                    properties:
+                      reachable:
+                        type: boolean
+                      path:
+                        type: string
+                      error:
+                        type: string
+  /operations:
+    get:
+      operationId: listOperations
+      summary: The live operations and the not-implemented ones
+      responses:
+        "200":
+          description: Both sets, so a caller can explain a 501 it received
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [live, notImplemented]
+                properties:
+                  live:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/OperationRef"
+                  notImplemented:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/OperationRef"
+  /reset:
+    post:
+      operationId: reset
+      summary: Reset the mock
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                mode:
+                  type: string
+                  enum: [wipe]
+                  default: wipe
+                entities:
+                  type: array
+                  items:
+                    type: string
+                  description: Omit to reset every entity.
+      responses:
+        "200":
+          description: The reset ran
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, mode, removed]
+                properties:
+                  ok:
+                    type: boolean
+                  mode:
+                    type: string
+                  removed:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                    description: Rows removed, keyed by entity name.
+  /requests:
+    get:
+      operationId: listRequests
+      summary: The request log
+      parameters:
+        - name: method
+          in: query
+          schema:
+            type: string
+        - name: path
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: integer
+        - name: live
+          in: query
+          schema:
+            type: boolean
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+      responses:
+        "200":
+          description: Matching requests, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [requests, total]
+                properties:
+                  total:
+                    type: integer
+                  requests:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RequestLogEntry"
+  /openapi.json:
+    get:
+      operationId: getControlDocument
+      summary: This document
+      responses:
+        "200":
+          description: The control API's own OpenAPI document
+  /teardown:
+    post:
+      operationId: teardown
+      summary: Stop serving and release the port
+      description: >
+        Idempotent: a second call to a mock already tearing down or gone returns the same
+        success answer rather than a destructive failure.
+      responses:
+        "200":
+          description: Shutdown initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok:
+                    type: boolean
+components:
+  schemas:
+    OperationRef:
+      type: object
+      required: [method, path]
+      properties:
+        method:
+          type: string
+        path:
+          type: string
+        operationId:
+          type: string
+        entity:
+          type: string
+    RequestLogEntry:
+      type: object
+      required: [at, method, path, status, live]
+      properties:
+        at:
+          type: string
+          format: date-time
+        method:
+          type: string
+        path:
+          type: string
+        status:
+          type: integer
+        live:
+          type: boolean
+        durationMs:
+          type: integer
