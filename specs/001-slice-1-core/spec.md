@@ -357,11 +357,15 @@ auditable record of what slice 1 carried, narrowed, or deferred.
 | FR-022 Request log with filtering | carried | FR-016 |
 | FR-023 Webhook HMAC signing | deferred | slice 6 |
 
-**FRs in this spec with no `docs/01` counterpart** — these are requirements slice 1 needs that the
-handoff states only in prose or not at all: FR-004 (refuse to start on an unusable document or
-selection), FR-007 (list parameter handling), FR-011 (identity allocation), FR-017 (idempotent
-teardown), FR-018 (the control plane describes itself), FR-021, FR-023 and FR-024 (the startup
-report and structured logging). They are traceable to the spec's own edge cases and to
+**FRs in this spec with no inherited *content* slot** — note this is a statement about meaning, not
+about numbering: spec FR-021 and FR-023 share numbers with `docs/01` FR-021 and FR-023, and the
+table above maps those two rows, but their subjects differ (the table's rows cover the handoff's
+reset-modes and webhook-signing requirements; the spec's FR-021 and FR-023 are the config-file
+contract and the startup report). The requirements below are ones slice 1 needs that the handoff
+states only in prose or not at all: FR-004 (refuse to start on an unusable document or selection),
+FR-007 (list parameter handling), FR-011 (identity allocation), FR-017 (idempotent teardown),
+FR-018 (the control plane describes itself), FR-021 (the config-file contract), FR-023 and FR-024
+(the startup report and structured logging). They trace to the spec's own edge cases and to
 constitution principle VI.
 
 ## Dependencies

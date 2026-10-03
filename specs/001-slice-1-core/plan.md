@@ -78,9 +78,10 @@ operations; thousands of records per collection without exhausting memory (paged
 principle X, and invents no behaviour the spec does not require.
 
 **Correction (independent review, 2026-10-03).** The Principle IX row first read "PASS — five config
-keys, each documented", which was wrong: principle IX requires *future* keys to be **reserved**
-(`signing`, `clock`, `storage.driver: postgres`, relationship `onDelete`) so the shape is stable
-before the feature lands. The initial schema offered only `storage.driver: ["sqlite"]`, which
+keys, each documented", which was wrong: principle IX requires *future* keys to be **reserved** so
+the shape is stable before the feature lands. **Three** are reserved in the schema — `signing`,
+`clock` and `storage.driver: postgres` — and a fourth, relationship `onDelete`, is deliberately
+*not* reserved (see the end of this paragraph). The initial schema offered only `storage.driver: ["sqlite"]`, which
 locks the door from the wrong side — adding Postgres would have been a schema change on every
 consumer config. The reviewer caught it; the schema now reserves those keys and `storage.driver`
 accepts `postgres` (refusing to start with a named message until the adapter exists, because a
