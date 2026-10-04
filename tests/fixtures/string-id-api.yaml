@@ -1,0 +1,67 @@
+openapi: 3.1.0
+info:
+  title: String Identity API
+  version: 1.0.0
+  description: >
+    A collection whose identity is a string with a declared pattern (`^W-[0-9]{6}$`).
+    FR-011 and data-model.md §"Identity allocation" require an allocated identity to satisfy
+    the declared pattern where one is present — a bare stringified counter does not.
+paths:
+  /widgets:
+    post:
+      operationId: createWidget
+      summary: Create a widget
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WidgetInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Widget" }
+  /widgets/{id}:
+    get:
+      operationId: readWidget
+      summary: Read one widget
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: "^W-[0-9]{6}$" }
+      responses:
+        "200":
+          description: The widget
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Widget" }
+        "404":
+          description: No widget with that identity
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+components:
+  schemas:
+    Widget:
+      type: object
+      title: Widget
+      required: [id, colour]
+      properties:
+        id: { type: string, pattern: "^W-[0-9]{6}$" }
+        colour: { type: string }
+    WidgetInput:
+      type: object
+      title: WidgetInput
+      required: [colour]
+      additionalProperties: false
+      properties:
+        colour: { type: string }
+    Error:
+      type: object
+      title: Error
+      required: [error, message]
+      properties:
+        error: { type: string }
+        message: { type: string }

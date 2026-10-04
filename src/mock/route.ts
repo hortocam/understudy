@@ -12,9 +12,9 @@ import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest }
 import type { DerivedModel, DocumentOperation, Resource, ResourceOperations } from "../spec/types.js";
 import type { CrudContext } from "./crud.js";
 import { createRecord, deleteRecord, readRecord, updateRecord } from "./crud.js";
-import { listRecords } from "./list.js";
+import { listRecords, ListCursorError } from "./list.js";
 import { collectOperations } from "../spec/operations.js";
-import { declaredClientStatus, NOT_IMPLEMENTED, notImplementedBody, renderDeclaredError } from "./errors.js";
+import { declaredClientStatus, NOT_IMPLEMENTED, notImplementedBody, renderDeclaredError, unboundOperationBody } from "./errors.js";
 import { validateBody, validateParameters } from "./validate.js";
 
 export interface RouteContext {
@@ -190,10 +190,14 @@ export function buildMockServer(context: RouteContext): FastifyInstance {
 
     const binding = bindings.get(key);
     if (!binding) {
-      // A live operation that matched no resource has no CRUD semantics to apply; answer the
-      // declared success status with an empty body rather than inventing a representation.
-      const status = declaredSuccess(declaredByKey.get(key) as DocumentOperation);
-      return reply.code(status).send(status === 204 ? undefined : {});
+      // A *live* operation the model could not bind to CRUD semantics (a route with no
+      // resource): it has no declared representation to serve and inventing `200 {}` would be
+      // a silent lie (constitution VI). Refuse loudly, naming the operation, exactly as for a
+      // known-but-unselected one.
+      const declared = declaredByKey.get(key);
+      return reply
+        .code(NOT_IMPLEMENTED)
+        .send(unboundOperationBody(declared ?? { method, path: route.template }));
     }
 
     const params: Record<string, string> = {};
@@ -216,7 +220,22 @@ export function buildMockServer(context: RouteContext): FastifyInstance {
           const error = invalidRequest(binding.operation);
           return reply.code(error.status).send(error.body);
         }
-        return reply.code(declaredSuccess(binding.operation)).send(listRecords(context.crud, binding.resource, { query }));
+        try {
+          return reply.code(declaredSuccess(binding.operation)).send(listRecords(context.crud, binding.resource, { query }));
+        } catch (error) {
+          if (error instanceof ListCursorError) {
+            // FR-007: an unrecognised cursor is the document's declared client error, not a
+            // silent empty page (data loss dressed up as success).
+            const rendered = renderDeclaredError(
+              binding.operation.operation,
+              declaredClientStatus(binding.operation.operation, 400) ?? 400,
+              { code: "invalid_cursor", message: error.message },
+            );
+            const fallback = { error: "invalid_cursor", message: error.message };
+            return reply.code(rendered?.status ?? 400).send(rendered?.body ?? fallback);
+          }
+          throw error;
+        }
       }
       case "create": {
         const parsed = parseJsonBody(await request.body);
@@ -237,14 +256,17 @@ export function buildMockServer(context: RouteContext): FastifyInstance {
         }
         return reply.code(declaredSuccess(binding.operation)).send(found);
       }
-      case "update": {
+      case "update":
+      case "replace": {
+        // FR-006: the *operation* decides the style — PATCH merges, PUT replaces.
+        const mode = binding.operation.method === "PUT" ? "replace" : "merge";
         const parsed = parseJsonBody(await request.body);
         const check = parsed.ok ? validateBody(binding.operation.operation, parsed.value) : { valid: false, messages: [] };
         if (!check.valid) {
           const error = invalidRequest(binding.operation);
           return reply.code(error.status).send(error.body);
         }
-        const updated = updateRecord(context.crud, binding.resource, identity, parsed.value);
+        const updated = updateRecord(context.crud, binding.resource, identity, parsed.value, mode);
         if (!updated) {
           const error = missingRecord(binding.resource, binding.operation, identity);
           return reply.code(error.status).send(error.body);

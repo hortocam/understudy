@@ -1,0 +1,89 @@
+openapi: 3.1.0
+info:
+  title: Cursor API
+  version: 1.0.0
+  description: >
+    A third paging style, distinct from inventory-api.yaml's offset/limit and
+    paged-api.yaml's page/size: an opaque cursor token, the shape docs/05-target-apis.md §1
+    measures on the target API (`paginationToken` ×21, a cursor, with a size cap). The cursor
+    is a start-after marker over the collection's order; `limit` is optional.
+paths:
+  /items:
+    get:
+      operationId: listItems
+      summary: List items, cursor paged
+      parameters:
+        - name: paginationToken
+          in: query
+          required: false
+          schema: { type: string }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: The items
+          content:
+            application/json:
+              schema:
+                type: array
+                title: Item
+                items: { $ref: "#/components/schemas/Item" }
+        "400":
+          description: The cursor is not recognised
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    post:
+      operationId: createItem
+      summary: Create an item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ItemInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Item" }
+  /items/{id}:
+    get:
+      operationId: readItem
+      summary: Read one item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: The item
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Item" }
+components:
+  schemas:
+    Item:
+      type: object
+      title: Item
+      required: [id, name]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+    ItemInput:
+      type: object
+      title: ItemInput
+      required: [name]
+      additionalProperties: false
+      properties:
+        name: { type: string }
+    Error:
+      type: object
+      title: Error
+      required: [error, message]
+      properties:
+        error: { type: string }
+        message: { type: string }

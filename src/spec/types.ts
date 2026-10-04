@@ -54,7 +54,10 @@ export interface ResourceOperations {
   list?: OperationRef;
   create?: OperationRef;
   read?: OperationRef;
+  /** The merge-style update (PATCH), when the document declares one (FR-006). */
   update?: OperationRef;
+  /** The replace-style update (PUT), when the document declares one (FR-006). */
+  replace?: OperationRef;
   delete?: OperationRef;
 }
 
@@ -97,6 +100,7 @@ export type AmbiguityKind =
   | "no-representation-schema"
   | "no-list-parameters"
   | "identity-field-unknown"
+  | "identity-pattern-unsupported"
   | "ambiguous-relationship";
 
 export interface Ambiguity {

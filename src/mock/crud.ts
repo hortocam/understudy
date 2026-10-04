@@ -8,11 +8,15 @@
 import type { IdsConfig } from "../config/load.js";
 import type { Store, StoredRecord } from "../store/index.js";
 import type { Resource } from "../spec/types.js";
+import { allocateIdentity } from "../spec/identity.js";
 
 export interface CrudContext {
   store: Store;
   ids: IdsConfig;
 }
+
+/** The declared update style of the operation being served (FR-006). */
+export type UpdateMode = "merge" | "replace";
 
 /** Coerce a record identity back to the type the document declares (FR-009, FR-011). */
 export function typedIdentity(resource: Resource, identity: string): string | number {
@@ -43,7 +47,10 @@ export function createRecord(
   resource: Resource,
   body: unknown,
 ): Record<string, unknown> {
-  const identity = String(context.store.nextIdentity(resource.name, context.ids.generatedStart));
+  // FR-011 / data-model.md §"Identity allocation": the counter is the reserved space; how it
+  // is *presented* follows the declared identity type and pattern.
+  const counter = context.store.nextIdentity(resource.name, context.ids.generatedStart);
+  const identity = allocateIdentity(resource, counter);
   const data = { ...asObject(body), [resource.idField]: typedIdentity(resource, identity) };
   const record = context.store.insert(resource.name, identity, data, "runtime");
   return present(resource, record);
@@ -67,6 +74,10 @@ export function readRecord(
  *   The identity is never taken from the body.
  * - `replace` (PUT) swaps the whole representation.
  *
+ * The mode is supplied by the caller from the *bound operation* (PATCH → merge, PUT →
+ * replace), not read off the resource: a document may declare both styles on one instance
+ * path, and the operation being served — not the resource — decides.
+ *
  * Returns undefined when the record does not exist; the caller decides whether that is a
  * declared 404 or a declared create (PUT-create is a slice-2 concern and is not invented
  * here).
@@ -76,13 +87,13 @@ export function updateRecord(
   resource: Resource,
   identity: string,
   body: unknown,
+  mode: UpdateMode,
 ): Record<string, unknown> | undefined {
   const existing = context.store.readOne(resource.name, identity);
   if (!existing) return undefined;
 
   const patch = asObject(body);
-  const next: Record<string, unknown> =
-    resource.updateMode === "replace" ? { ...patch } : { ...asObject(existing.data), ...patch };
+  const next: Record<string, unknown> = mode === "replace" ? { ...patch } : { ...asObject(existing.data), ...patch };
   next[resource.idField] = typedIdentity(resource, identity);
 
   const record = context.store.update(resource.name, identity, next);

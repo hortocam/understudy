@@ -20,20 +20,43 @@ export interface NotImplementedBody {
 }
 
 /** Build the `NotImplementedBody` for a known-but-unselected operation, naming it. */
-export function notImplementedBody(operation: {
-  method: string;
-  path: string;
-  operationId?: string;
-}): NotImplementedBody {
+export function notImplementedBody(
+  operation: {
+    method: string;
+    path: string;
+    operationId?: string;
+  },
+  reason?: string,
+): NotImplementedBody {
   const named = `${operation.method} ${operation.path}${operation.operationId ? ` (${operation.operationId})` : ""}`;
   const body: NotImplementedBody = {
     error: "not_implemented",
     method: operation.method,
     path: operation.path,
-    detail: `operation ${named} is in the document but was not selected; this mock does not implement it`,
+    detail:
+      reason ??
+      `operation ${named} is in the document but was not selected; this mock does not implement it`,
   };
   if (operation.operationId !== undefined) body.operationId = operation.operationId;
   return body;
+}
+
+/**
+ * The refusal for a *live* operation the model could not bind to CRUD semantics (a route
+ * with no resource). It is not a record-not-found and it is not a success: the mock has
+ * nothing honest to serve, so it says so loudly rather than answering an invented `200 {}`
+ * (constitution VI). Same body shape as `NotImplementedBody` — one tool-owned error contract.
+ */
+export function unboundOperationBody(operation: {
+  method: string;
+  path: string;
+  operationId?: string;
+}): NotImplementedBody {
+  const named = `${operation.method} ${operation.path}${operation.operationId ? ` (${operation.operationId})` : ""}`;
+  return notImplementedBody(
+    operation,
+    `operation ${named} is live but this mock derived no CRUD semantics for it (reported at startup as a route without a resource); this mock does not implement it`,
+  );
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

@@ -6,9 +6,9 @@
  * memory (T025). Where the document declares no list parameters the full collection is
  * returned — and the startup report already says so (T046).
  *
- * Three paging styles are recognised, from the parameters the document declares:
- *   offset/limit · page/size · cursor/limit (a cursor token is honoured as an opaque
- *   start-after marker). A document declaring none gets the full collection.
+ * Paging styles are recognised from the parameters the document declares:
+ *   offset/limit · page/size · cursor (an opaque token honoured as a start-after marker over
+ *   the collection's order). A document declaring none gets the full collection.
  */
 import type { Store, StoredRecord } from "../store/index.js";
 import type { Resource } from "../spec/types.js";
@@ -27,13 +27,36 @@ export interface PagingStyle {
 }
 
 const OFFSET_NAMES = ["offset", "start", "skip"];
-const LIMIT_NAMES = ["limit", "size", "per_page", "per-page", "pagesize", "count"];
+const LIMIT_NAMES = ["limit", "size", "per_page", "per-page", "pagesize", "count", "maxpagesize", "page_size", "perpage"];
 const PAGE_NAMES = ["page"];
-const CURSOR_NAMES = ["cursor", "paginationtoken", "page_token"];
+// The target API's measured cursor spellings (docs/05-target-apis.md §1: `paginationToken`),
+// plus the common `cursor`/`page_token`/`nextPageToken`. Kept in step with the derivation's
+// `classifyParam`, which decides `kind: "paging"` from the same family.
+const CURSOR_NAMES = ["cursor", "paginationtoken", "page_token", "pagetoken", "nextpagetoken", "token"];
+
+/** A cursor token that names no record in the collection (FR-007: never a silent empty page). */
+export class ListCursorError extends Error {
+  readonly cursor: string;
+  constructor(cursor: string) {
+    super(`the cursor ${JSON.stringify(cursor)} does not name a record in this collection`);
+    this.name = "ListCursorError";
+    this.cursor = cursor;
+  }
+}
+
+/** Look up a query value by any of `names`, case-insensitively (HTTP query keys keep their case). */
+function queryValue(query: Record<string, string | undefined>, name: string): string | undefined {
+  if (query[name] !== undefined) return query[name];
+  const lowered = name.toLowerCase();
+  for (const [key, value] of Object.entries(query)) {
+    if (key.toLowerCase() === lowered && value !== undefined) return value;
+  }
+  return undefined;
+}
 
 function firstNumber(query: Record<string, string | undefined>, names: string[]): number | undefined {
   for (const name of names) {
-    const raw = query[name];
+    const raw = queryValue(query, name);
     if (raw === undefined) continue;
     const value = Number.parseInt(raw, 10);
     if (!Number.isNaN(value)) return value;
@@ -43,7 +66,7 @@ function firstNumber(query: Record<string, string | undefined>, names: string[])
 
 function firstString(query: Record<string, string | undefined>, names: string[]): string | undefined {
   for (const name of names) {
-    const raw = query[name];
+    const raw = queryValue(query, name);
     if (raw !== undefined) return raw;
   }
   return undefined;
@@ -62,8 +85,10 @@ export function pagingStyle(resource: Resource, query: Record<string, string | u
     // page/size: pages are 1-based in every document that declares `page`.
     return { style: "page", offset: Math.max(page - 1, 0) * limit, limit };
   }
-  if (limit !== undefined && cursor !== undefined) {
-    return { style: "cursor", cursor, limit };
+  // A cursor is a paging instruction on its own: a token without a companion limit is the
+  // tail from that token, not "no paging" (and never the empty collection a filter would give).
+  if (cursor !== undefined) {
+    return { style: "cursor", cursor, ...(limit !== undefined ? { limit } : {}) };
   }
   if (limit !== undefined || offset !== undefined) {
     return { style: "offset", ...(offset !== undefined ? { offset } : {}), ...(limit !== undefined ? { limit } : {}) };
@@ -75,6 +100,10 @@ function declaredFilters(resource: Resource): Set<string> {
   return new Set(resource.listParams.filter((param) => param.kind === "filter").map((param) => param.name));
 }
 
+/**
+ * @throws ListCursorError when a cursor token names no record — the caller answers the
+ *   operation's declared client error rather than a silent empty page (FR-007).
+ */
 export function listRecords(context: CrudContext, resource: Resource, request: ListRequest): Record<string, unknown>[] {
   const filters = [...declaredFilters(resource)]
     .filter((name) => request.query[name] !== undefined)
@@ -97,11 +126,20 @@ export function listRecords(context: CrudContext, resource: Resource, request: L
     : [];
 
   const paging = pagingStyle(resource, request.query);
+  if (paging.style === "cursor" && paging.cursor !== undefined) {
+    // The store owns the order, so it resolves the token; but an unknown token must be a
+    // declared error, not an empty page — check it resolves before asking for the window.
+    if (!context.store.readOne(resource.name, paging.cursor)) {
+      throw new ListCursorError(paging.cursor);
+    }
+  }
+
   const query: Parameters<Store["listPaged"]>[1] = {};
   if (filters.length > 0) query.filters = filters;
   if (sort.length > 0) query.sort = sort;
   if (paging.offset !== undefined) query.offset = paging.offset;
   if (paging.limit !== undefined) query.limit = paging.limit;
+  if (paging.style === "cursor" && paging.cursor !== undefined) query.after = paging.cursor;
 
   return context.store.listPaged(resource.name, query).map((record: StoredRecord) => present(resource, record));
 }

@@ -41,12 +41,20 @@ export interface StoreOptions {
   path: string;
 }
 
-/** A list read the CRUD engine asks the store for: filter, sort and page in one step. */
+/**
+ * A list read the CRUD engine asks the store for: filter, sort and page in one step.
+ *
+ * `after` is a cursor token — the identity of the last record a caller saw — and the read
+ * returns the records that follow it in the collection's order (FR-007). Resolving the token
+ * to a position is the store's job: it owns the row order, so a cursor page is never
+ * assembled by loading the collection into JS.
+ */
 export interface ListQuery {
   filters?: Array<{ field: string; value: string | number | boolean }>;
   sort?: Array<{ field: string; direction: "asc" | "desc" }>;
   offset?: number;
   limit?: number;
+  after?: string;
 }
 
 export interface Store {
