@@ -13,6 +13,8 @@ import { createLogger, renderRefusal, renderStartupReport, type Logger } from ".
 import { SqliteStore } from "./store/sqlite.js";
 import type { Store } from "./store/index.js";
 import { buildMockServer } from "./mock/route.js";
+import { controlApiBytes } from "./control/openapi.js";
+import { buildControlInstance } from "./control/server.js";
 import { loadSpec } from "./spec/load.js";
 import { selectOperations } from "./spec/operations.js";
 import { buildStartupReport } from "./spec/report.js";
@@ -44,7 +46,13 @@ export interface RunningMock {
   /** The report as data — the same object the human and structured renderings came from. */
   report: StartupReport;
   store: Store;
-  /** Stop serving and close the store. Idempotent. */
+  /** The control surface's base URL: the mock's own address unless `control.port` is set. */
+  controlUrl: string;
+  /** The reserved path prefix of the control surface (`config.control.prefix`). */
+  controlPrefix: string;
+  /** Resolves once the mock has fully shut down: port released, store closed (FR-017). */
+  closed: Promise<void>;
+  /** Stop serving and close the store. Idempotent; a second caller awaits the same shutdown. */
   close(): Promise<void>;
 }
 
@@ -89,21 +97,76 @@ export async function createMock(
     for (const resource of model.resources) store.ensureResource(resource.name);
     store.setMeta("spec_hash", spec.contentHash);
 
-    // 6. Serve the mocked surface. Only after 1–5 have succeeded does anything bind.
+    // 6. Serve the mocked surface and the control plane. Only after 1–5 have succeeded does
+    // anything bind.
     const server = buildMockServer({
       document: spec.document,
       model,
       live: selection.live,
       crud: { store, ids: config.ids },
       basePath: config.server.basePath,
+      recordRequest: (entry) => store.appendRequest(entry),
     });
+
+    let closing: Promise<void> | undefined;
+    let markClosed: () => void = () => {};
+    const closed = new Promise<void>((resolve) => {
+      markClosed = resolve;
+    });
+
+    const prefix = config.control.prefix;
+    const control = buildControlInstance({
+      prefix,
+      store,
+      live: report.live,
+      notImplemented: report.notSelected,
+      resources: model.resources,
+      idsStart: config.ids.generatedStart,
+      openapiBytes: controlApiBytes,
+      onTeardown: () => {
+        close().catch((error: unknown) => {
+          logger.error("teardown failed", { message: error instanceof Error ? error.message : String(error) });
+        });
+      },
+    });
+    await control.ready();
 
     const port = options.port ?? config.server.port;
     const host = options.host ?? config.server.host;
+    const separateControlPort = config.control.port;
+    if (separateControlPort === undefined) {
+      // Same port: requests under the reserved prefix are handed to the control instance and
+      // never reach the mocked surface's catch-all (FR-012).
+      server.addHook("onRequest", (request, reply, done) => {
+        const rawPath = (request.raw.url ?? "").split("?")[0] ?? "";
+        if (rawPath === prefix || rawPath.startsWith(`${prefix}/`)) {
+          reply.hijack();
+          control.server.emit("request", request.raw, reply.raw);
+          return;
+        }
+        done();
+      });
+    }
     await server.listen({ port, host });
 
     const address = server.server.address();
     const boundPort = isObject(address) && typeof address.port === "number" ? address.port : port;
+    let controlUrl = `http://${host}:${boundPort}`;
+    if (separateControlPort !== undefined) {
+      const controlHost = config.control.host ?? host;
+      try {
+        await control.listen({ port: separateControlPort, host: controlHost });
+      } catch (error) {
+        // The mocked surface is already bound; do not leave it serving half a mock.
+        await server.close();
+        store.close();
+        throw error;
+      }
+      const controlAddress = control.server.address();
+      const controlPort =
+        isObject(controlAddress) && typeof controlAddress.port === "number" ? controlAddress.port : separateControlPort;
+      controlUrl = `http://${controlHost}:${controlPort}`;
+    }
     options.onListening?.(boundPort);
 
     // 7. Report — the deliverable, not debug output (FR-023, SC-006).
@@ -112,15 +175,30 @@ export async function createMock(
     const structured: Record<string, unknown> = { report };
     logger.info("startup report", structured);
 
-    let closed = false;
-    const close = async (): Promise<void> => {
-      if (closed) return;
-      closed = true;
-      await server.close();
-      store.close();
-    };
+    function close(): Promise<void> {
+      closing ??= (async () => {
+        try {
+          await server.close();
+          // Harmless when the control instance was only mounted, never listened.
+          await control.close();
+          store.close();
+        } finally {
+          markClosed();
+        }
+      })();
+      return closing;
+    }
 
-    return { baseUrl: `http://${host}:${boundPort}`, port: boundPort, report, store, close };
+    return {
+      baseUrl: `http://${host}:${boundPort}`,
+      port: boundPort,
+      report,
+      store,
+      controlUrl,
+      controlPrefix: prefix,
+      closed,
+      close,
+    };
   } catch (error) {
     // FR-004/FR-024: a refusal is human-readable and names the cause; the structured log
     // carries the same fact. Nothing was bound, so nothing has to be torn down.
