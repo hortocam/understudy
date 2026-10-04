@@ -376,3 +376,17 @@ constitution principle VI.
   its principles, notably II (API-first), VII (test-first), and VI (explicit over magic).
 - `docs/` — the handoff package; this spec refines `docs/01` Epics A and B and must be read as
   consistent with `docs/02` §3, §4, §5 and §10.
+- `tasks.md` carries a post-approval amendment record. **Amendment 2026-10-04 (A1)** pins the
+  not-implemented response — FR-003's "not implemented in this mock" answer — to one exported
+  constant (`NOT_IMPLEMENTED`, 501 per RFC 9110 §15.6.2) and one body schema, replacing the prose-only
+  assertion in T021/T026. It changes **no requirement** in this document; see the amendment section
+  at the tail of `tasks.md` for the pinned decisions and their justification.
+
+## Amendment Log
+
+*This spec was approved as-is; entries here record amendments that touch its requirements. An
+amendment that changes no requirement is recorded in `tasks.md` instead and merely noted below.*
+
+| Date | Ref | Class | Effect on this spec |
+|---|---|---|---|
+| 2026-10-04 | A1 | PATCH | none — pins the not-implemented response (constant + body) in `tasks.md` T021/T026; FR-003 and SC-004 are unchanged and remain the contract |
