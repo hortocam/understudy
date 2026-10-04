@@ -280,3 +280,15 @@ no existing task above is modified.
       the implemented refuse-loudly-on-presence behaviour (`contradicts`, spec-side). Source: FR-002
       vs `contracts/config.schema.yaml` `operations` item pattern; constitution IX. Routes through
       the coordinator/PR-#2 gate because it amends a reviewed contract.
+- [X] T049 Read list parameters declared at the **Path Item Object** level, not only on the
+      operation (`contradicts`). OpenAPI "Fixed Fields" makes a path item's `parameters` inherited
+      by every operation on the path, so T046's rule false-fired on a document that declares shared
+      paging/sort at path level: it published a FALSE `no-list-parameters` ambiguity ("every list
+      request returns the full collection unpaged and unsorted") and left `Resource.listParams`
+      empty — the field Phase 3's list handling reads. Fixed by merging path-level and
+      operation-level query parameters in `listParamsOf`/`deriveResource` (operation level wins on
+      a shared name), and the report no longer claims a missing paging style when one is declared at
+      either level. Source: FR-007, plan.md → "Derivation rules" → List semantics, OpenAPI
+      Specification → Path Item Object. Fixture `tests/fixtures/path-params-api.yaml` (path-level and
+      mixed-level declarations) added to `tests/unit/resources.test.ts` before the code
+      (red → green).

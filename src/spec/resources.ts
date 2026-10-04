@@ -132,22 +132,38 @@ function classifyParam(name: string): ListParamKind {
   return "filter";
 }
 
-function listParamsOf(operation: Record<string, unknown> | undefined): ListParam[] {
-  if (!operation) return [];
-  const parameters = operation.parameters;
-  if (!Array.isArray(parameters)) return [];
-  const params: ListParam[] = [];
+/** The query parameters declared by a `parameters` array, keyed by name. */
+function queryParamsOf(parameters: unknown): Map<string, Record<string, unknown>> {
+  const byName = new Map<string, Record<string, unknown>>();
+  if (!Array.isArray(parameters)) return byName;
   for (const parameter of parameters) {
     if (!isObject(parameter)) continue;
     if (parameter.in !== "query" || typeof parameter.name !== "string") continue;
-    params.push({
-      name: parameter.name,
-      in: "query",
-      kind: classifyParam(parameter.name),
-      required: parameter.required === true,
-    });
+    byName.set(parameter.name, parameter);
   }
-  return params;
+  return byName;
+}
+
+/**
+ * The list parameters an operation declares.
+ *
+ * Per OpenAPI "Fixed Fields", a Path Item Object's `parameters` are inherited by every
+ * operation on the path, and an operation-level parameter overrides a path-level one with
+ * the same name. Reading only `operation.parameters` would miss shared paging/sort
+ * declarations and make the report claim a collection is unpaged when it is not (FR-007).
+ */
+function listParamsOf(
+  operation: Record<string, unknown> | undefined,
+  pathParameters?: unknown,
+): ListParam[] {
+  const merged = queryParamsOf(pathParameters);
+  for (const [name, parameter] of queryParamsOf(operation?.parameters)) merged.set(name, parameter);
+  return [...merged.values()].map((parameter) => ({
+    name: parameter.name as string,
+    in: "query",
+    kind: classifyParam(parameter.name as string),
+    required: parameter.required === true,
+  }));
 }
 
 function operationRef(operation: DocumentOperation): OperationRef {
@@ -171,6 +187,14 @@ export function deriveModel(
     const list = liveByPath.get(op.path) ?? [];
     list.push(op);
     liveByPath.set(op.path, list);
+  }
+
+  // Path Item Object `parameters` are inherited by every operation on the path.
+  const pathItemParameters = new Map<string, unknown>();
+  if (isObject(document.paths)) {
+    for (const [path, pathItem] of Object.entries(document.paths)) {
+      if (isObject(pathItem)) pathItemParameters.set(path, pathItem.parameters);
+    }
   }
 
   const collectionPaths = new Set<string>();
@@ -206,7 +230,14 @@ export function deriveModel(
     const instanceOps = instance ? liveByPath.get(instance.instancePath) ?? [] : [];
     if (collectionOps.length === 0 && instanceOps.length === 0) continue;
 
-    const resource = deriveResource(collectionPath, collectionOps, instanceOps, instance, ambiguities);
+    const resource = deriveResource(
+      collectionPath,
+      collectionOps,
+      instanceOps,
+      instance,
+      ambiguities,
+      pathItemParameters.get(collectionPath),
+    );
     resources.push(resource);
     if (instance) instancePathToResource.set(instance.instancePath, resource.name);
   }
@@ -221,6 +252,7 @@ function deriveResource(
   instanceOps: DocumentOperation[],
   instance: { instancePath: string; param: string } | undefined,
   ambiguities: Ambiguity[],
+  pathParameters?: unknown,
 ): Resource {
   const listOp = findMethod(collectionOps, "GET");
   const createOp = findMethod(collectionOps, "POST");
@@ -245,7 +277,7 @@ function deriveResource(
   const idType = idProperty?.type === "string" ? "string" : "integer";
   const idPattern = typeof idProperty?.pattern === "string" ? idProperty.pattern : undefined;
 
-  const listParams = listParamsOf(listOp?.operation);
+  const listParams = listParamsOf(listOp?.operation, pathParameters);
 
   if (representationSchema === undefined) {
     const op = listOp ?? createOp ?? readOp;

@@ -71,6 +71,27 @@ describe("resource derivation", () => {
     }
   });
 
+  it("reads list parameters declared at the path-item level, not only on the operation (FR-007)", async () => {
+    const loaded = await loadSpec(fixture("path-params-api.yaml"));
+    const live = collectOperations(loaded.document);
+    const model = deriveModel(loaded.document, live);
+    const byName = new Map(model.resources.map((resource) => [resource.name, resource]));
+
+    // OpenAPI "Fixed Fields": a Path Item Object's `parameters` are inherited by every
+    // operation on the path. /widgets declares limit+sort at the PATH level only.
+    const widget = byName.get("Widget");
+    expect(widget?.listParams.map((param) => param.name).sort()).toEqual(["limit", "sort"]);
+    // ...so the report must NOT claim the full collection is returned unpaged/unsorted.
+    expect(model.ambiguities.some((ambiguity) => ambiguity.kind === "no-list-parameters" && ambiguity.path === "/widgets")).toBe(false);
+
+    // /gadgets mixes levels: `sort` comes from the path, `limit` is redeclared at the
+    // operation level (same name+location, so it overrides), and `name` is operation-only.
+    const gadget = byName.get("Gadget");
+    expect(gadget?.listParams.map((param) => param.name).sort()).toEqual(["limit", "name", "sort"]);
+    expect(gadget?.listParams.find((param) => param.name === "limit")?.required).toBe(true);
+    expect(model.ambiguities.some((ambiguity) => ambiguity.kind === "no-list-parameters" && ambiguity.path === "/gadgets")).toBe(false);
+  });
+
   it("builds a startup report carrying evidence on every inferred relationship", async () => {
     const { loaded, live, model } = await deriveFromFixture();
     const report = buildStartupReport({ spec: loaded, live, notSelected: [], model });
