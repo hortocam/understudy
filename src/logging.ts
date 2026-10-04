@@ -70,8 +70,9 @@ export function renderStartupReport(report: StartupReport): string {
   for (const resource of report.resources) {
     const instance = resource.instancePath ? ` instance ${resource.instancePath}` : "";
     const pattern = resource.idPattern ? ` pattern ${resource.idPattern}` : "";
+    const params = `params=[${resource.listParams.map((param) => `${param.name}:${param.kind}`).join(",")}]`;
     lines.push(
-      `  ${resource.name} (${resource.collectionPath}${instance}) id=${resource.idField}:${resource.idType}${pattern} name=${resource.nameSource}`,
+      `  ${resource.name} (${resource.collectionPath}${instance}) id=${resource.idField}:${resource.idType}${pattern} ${params} name=${resource.nameSource}`,
     );
   }
 

@@ -68,6 +68,7 @@ export interface Relationship {
 export type AmbiguityKind =
   | "route-without-resource"
   | "no-representation-schema"
+  | "no-list-parameters"
   | "identity-field-unknown"
   | "ambiguous-relationship";
 

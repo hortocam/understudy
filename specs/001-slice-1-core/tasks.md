@@ -254,3 +254,29 @@ evidence.
 **Stop-and-review gates**: the spec and plan are the human checkpoints (already passed). Phase 3's
 checkpoint is the natural third — at that point the tool either works or does not, and no amount of
 later polish fixes a mock that does not persist.
+
+---
+
+## Phase 8: Convergence
+
+Appended by the convergence pass over Phase 1 + 2 (reviewer round 1, findings F1–F3). Append-only:
+no existing task above is modified.
+
+- [X] T046 Report a `no-list-parameters` ambiguity when a live list operation declares no query
+      parameters, and render each resource's declared list parameters, so FR-007's "say so in the
+      startup report" is implemented rather than silent (`partial`). Source: FR-007,
+      plan.md → "Derivation rules" → List semantics, data-model.md §1 (ambiguity list),
+      quickstart.md §3 (a document with no declared list parameters). Test added to
+      `tests/unit/resources.test.ts` before the code (red → green).
+- [X] T047 Rename the identity counter meta key from `identity:<resource>` to the documented
+      `id_seq:<resource>`, so the stored format matches data-model.md §2/§3 that Phase 4 (T032,
+      wipe-reset) and slices 2–3 will read (`contradicts`). The doc is the frozen stored format; the
+      code is renamed to it. Source: data-model.md §2/§3. Test added to `tests/unit/store.test.ts`
+      before the code (red → green).
+- [ ] T048 Contract correction (needs coordinator approval — do NOT edit
+      `contracts/config.schema.yaml` unilaterally): widen the `operations` item pattern so an
+      `operationId` containing a hyphen or a dot (e.g. `get-widgets`, `api.getWidgets`) is accepted,
+      and align the `signing`/`clock` descriptions (currently "Setting it has no effect yet") with
+      the implemented refuse-loudly-on-presence behaviour (`contradicts`, spec-side). Source: FR-002
+      vs `contracts/config.schema.yaml` `operations` item pattern; constitution IX. Routes through
+      the coordinator/PR-#2 gate because it amends a reviewed contract.

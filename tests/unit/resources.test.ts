@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { renderStartupReport } from "../../src/logging.js";
 import { loadSpec } from "../../src/spec/load.js";
 import { collectOperations } from "../../src/spec/operations.js";
 import { buildStartupReport } from "../../src/spec/report.js";
@@ -53,6 +54,23 @@ describe("resource derivation", () => {
     expect(model.ambiguities.some((ambiguity) => ambiguity.path === "/pings")).toBe(true);
   });
 
+  it("says so when a live list operation declares no query parameters (FR-007)", async () => {
+    const { model } = await deriveFromFixture();
+
+    // /inventory declares paging/sort/filter params, so it is NOT ambiguous.
+    expect(model.ambiguities.some((ambiguity) => ambiguity.path === "/inventory")).toBe(false);
+
+    // Every other collection has a live list op with zero declared query parameters;
+    // plan.md "Derivation rules" → List semantics and data-model.md §1 require it reported.
+    for (const path of ["/orders", "/warehouses", "/suppliers"]) {
+      const ambiguity = model.ambiguities.find(
+        (candidate) => candidate.kind === "no-list-parameters" && candidate.path === path,
+      );
+      expect(ambiguity, `${path} declares no list parameters and must be called out`).toBeDefined();
+      expect(ambiguity?.detail).toContain("full collection");
+    }
+  });
+
   it("builds a startup report carrying evidence on every inferred relationship", async () => {
     const { loaded, live, model } = await deriveFromFixture();
     const report = buildStartupReport({ spec: loaded, live, notSelected: [], model });
@@ -65,5 +83,18 @@ describe("resource derivation", () => {
     expect(report.relationships.every((relationship) => relationship.evidence)).toBe(true);
     expect(report.ambiguities.length).toBeGreaterThan(0);
     expect(report.live).toHaveLength(live.length);
+  });
+
+  it("renders the declared list parameters a human needs to read FR-007", async () => {
+    const { loaded, live, model } = await deriveFromFixture();
+    const report = buildStartupReport({ spec: loaded, live, notSelected: [], model });
+    const text = renderStartupReport(report);
+    const lines = text.split("\n");
+
+    const inventoryEntity = lines.find((line) => line.includes("(/inventory instance"));
+    expect(inventoryEntity).toContain("params=[limit:paging,sort:sort,name:filter]");
+
+    const ordersEntity = lines.find((line) => line.includes("(/orders instance"));
+    expect(ordersEntity).toContain("params=[]");
   });
 });

@@ -203,7 +203,9 @@ export class SqliteStore implements Store {
   }
 
   nextIdentity(resource: string, start: number): number {
-    const key = `identity:${resource}`;
+    // Key name frozen by data-model.md §2/§3 (`id_seq:<resource>`): slice 2/3 and
+    // Phase 4's wipe (T032) read this exact key to reset the counter.
+    const key = `id_seq:${resource}`;
     const current = this.getMeta(key);
     const value = current === undefined ? start : Number.parseInt(current, 10);
     this.setMeta(key, String(value + 1));

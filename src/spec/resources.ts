@@ -245,6 +245,8 @@ function deriveResource(
   const idType = idProperty?.type === "string" ? "string" : "integer";
   const idPattern = typeof idProperty?.pattern === "string" ? idProperty.pattern : undefined;
 
+  const listParams = listParamsOf(listOp?.operation);
+
   if (representationSchema === undefined) {
     const op = listOp ?? createOp ?? readOp;
     ambiguities.push({
@@ -261,6 +263,18 @@ function deriveResource(
     });
   }
 
+  // FR-007 / plan.md "Derivation rules" → List semantics: a list operation that declares
+  // no query parameters returns the full collection, and the report must say so rather than
+  // let the caller assume filtering/paging exists.
+  if (listOp && listParams.length === 0) {
+    ambiguities.push({
+      kind: "no-list-parameters",
+      path: collectionPath,
+      ...(listOp.operationId !== undefined ? { operationId: listOp.operationId } : {}),
+      detail: `${name} declares no list parameters; every list request returns the full collection unpaged and unsorted`,
+    });
+  }
+
   const operations = {
     ...(listOp ? { list: operationRef(listOp) } : {}),
     ...(createOp ? { create: operationRef(createOp) } : {}),
@@ -274,7 +288,7 @@ function deriveResource(
     collectionPath,
     idField,
     idType,
-    listParams: listParamsOf(listOp?.operation),
+    listParams,
     operations,
     nameSource: title ? "schema-title" : "path-segment",
   };

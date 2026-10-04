@@ -56,6 +56,15 @@ describe("sqlite store", () => {
     store.close();
   });
 
+  it("stores the identity counter under the documented `id_seq:<resource>` key", () => {
+    const store = tempStore();
+    store.nextIdentity("Inventory", 100000);
+    // data-model.md §2/§3: "The counter lives in `_understudy_meta` (`id_seq:<resource>`)".
+    // The stored format is frozen at merge and read by slice 2/3 and T032's wipe-reset.
+    expect(store.getMeta("id_seq:Inventory")).toBe("100001");
+    store.close();
+  });
+
   it("appends and reads the request log", () => {
     const store = tempStore();
     store.appendRequest({ method: "GET", path: "/inventory", status: 200, live: true, durationMs: 3, at: "2026-10-03T00:00:00.000Z" });
