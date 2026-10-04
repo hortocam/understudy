@@ -1,0 +1,72 @@
+openapi: 3.1.0
+info:
+  title: Path Params API
+  version: 1.0.0
+paths:
+  # OpenAPI "Fixed Fields": a Path Item Object's `parameters` are inherited by every
+  # operation on the path. /widgets declares paging + sort at the PATH level only.
+  /widgets:
+    parameters:
+      - name: limit
+        in: query
+        required: false
+        schema: { type: integer }
+      - name: sort
+        in: query
+        required: false
+        schema: { type: string }
+    get:
+      operationId: listWidgets
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                title: Widget
+                items: { $ref: "#/components/schemas/Widget" }
+  # /gadgets mixes both levels: `sort` comes from the path, `limit` is redeclared at the
+  # operation level (same name + location, so it overrides), and `name` is operation-only.
+  /gadgets:
+    parameters:
+      - name: sort
+        in: query
+        required: false
+        schema: { type: string }
+      - name: limit
+        in: query
+        required: false
+        schema: { type: integer }
+    get:
+      operationId: listGadgets
+      parameters:
+        - name: limit
+          in: query
+          required: true
+          schema: { type: integer }
+        - name: name
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                title: Gadget
+                items: { $ref: "#/components/schemas/Gadget" }
+components:
+  schemas:
+    Widget:
+      type: object
+      title: Widget
+      properties:
+        id: { type: integer }
+    Gadget:
+      type: object
+      title: Gadget
+      properties:
+        id: { type: integer }
