@@ -1,0 +1,147 @@
+openapi: 3.1.0
+info:
+  title: Update Styles API
+  version: 1.0.0
+  description: >
+    A fixture whose instance path declares BOTH update styles — PATCH (merge) and PUT
+    (replace) — so FR-006 can be proven to honour both rather than collapsing them into one
+    slot. It also carries a route with no resource (`/reports/{year}/{month}`), so a live
+    operation the model could not bind to CRUD can be proven to refuse loudly instead of
+    answering a silent empty 2xx (constitution VI).
+paths:
+  /gadgets:
+    post:
+      operationId: createGadget
+      summary: Create a gadget
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GadgetInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Gadget" }
+  /gadgets/{id}:
+    get:
+      operationId: readGadget
+      summary: Read one gadget
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: The gadget
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Gadget" }
+        "404":
+          description: No gadget with that identity
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    patch:
+      operationId: mergeGadget
+      summary: Merge fields into one gadget
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GadgetPatch" }
+      responses:
+        "200":
+          description: The merged gadget
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Gadget" }
+        "404":
+          description: No gadget with that identity
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    put:
+      operationId: replaceGadget
+      summary: Replace the whole gadget
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GadgetInput" }
+      responses:
+        "200":
+          description: The replaced gadget
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Gadget" }
+        "404":
+          description: No gadget with that identity
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /reports/{year}/{month}:
+    get:
+      operationId: getReport
+      summary: A route with no resource — two path parameters
+      parameters:
+        - name: year
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: month
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: A report, declared with no body schema
+components:
+  schemas:
+    Gadget:
+      type: object
+      title: Gadget
+      required: [id, colour, finish]
+      properties:
+        id: { type: integer }
+        colour: { type: string }
+        finish: { type: string }
+        # Optional, so a replace (PUT) that omits it proves the whole representation was
+        # swapped, not merged (FR-006).
+        label: { type: string }
+    GadgetInput:
+      type: object
+      title: GadgetInput
+      required: [colour, finish]
+      additionalProperties: false
+      properties:
+        colour: { type: string }
+        finish: { type: string }
+        label: { type: string }
+    GadgetPatch:
+      type: object
+      title: GadgetPatch
+      additionalProperties: false
+      properties:
+        colour: { type: string }
+        finish: { type: string }
+        label: { type: string }
+    Error:
+      type: object
+      title: Error
+      required: [error, message]
+      properties:
+        error: { type: string }
+        message: { type: string }

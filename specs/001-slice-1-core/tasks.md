@@ -353,3 +353,63 @@ their surrounding text.
 `NOT_IMPLEMENTED` and `NotImplementedBody` **and nothing else**. It does not authorise: adding any
 tool-owned schema to the mocked surface; changing any other FR or SC; or editing
 `contracts/config.schema.yaml` (that remains open task T048, coordinator-routed).
+
+---
+
+## Phase 8: Convergence (Phase 3)
+
+Appended by the convergence pass over Phase 3 (reviewer round 1, findings F-A/F-B/F-C).
+Append-only: no existing task above is modified.
+
+- [X] T050 Honour **both** declared update styles (FR-006, `contradicts`). `deriveResource` kept a
+      single `update` slot (`findMethod(instanceOps, "PATCH") ?? findMethod(instanceOps, "PUT")`),
+      so when a document lived PATCH *and* PUT on one instance path, PUT was live but unbound and
+      `route.ts`'s no-CRUD fallback answered a silent `200 {}` that changed nothing (FR-005/FR-006
+      edge case "PUT against a record that does not exist"). Fixed by binding PATCH → `update`
+      (merge) and PUT → `replace` (replace) as separate `ResourceOperations` slots, deciding the
+      style from the **bound operation** in `crud.updateRecord(mode)`, and leaving `Resource.updateMode`
+      unset when both are declared (data-model.md §1 has no single value for that case). The same
+      change makes a live operation the model cannot bind (a route with no resource) refuse loudly
+      with the `NOT_IMPLEMENTED` constant and an operation-naming body (constitution VI) instead of
+      the silent empty 2xx. Source: FR-005, FR-006, spec.md edge cases, constitution VI. Fixture
+      `tests/fixtures/update-styles-api.yaml` and `tests/integration/update-styles.test.ts` added
+      before the code (red → green).
+- [X] T051 Allocate a `string` identity that **satisfies the declared `pattern`** (FR-011,
+      `contradicts`). The identity counter was stringified verbatim, so `idType: string` with
+      `pattern: ^W-[0-9]{6}$` allocated `"100000"`, which does not match the document — a mock
+      differing from the real service in *shape*. Fixed by `src/spec/identity.ts`, a bounded
+      pattern-to-value generator (literal prefix/suffix around digit/letter runs with fixed
+      quantifiers; the measured identity shapes in docs/05-target-apis.md §1) whose output is
+      verified against the declared pattern before use; an unsupported pattern is reported as the
+      `identity-pattern-unsupported` ambiguity and falls back to an opaque short id, never a
+      non-conforming counter. Source: FR-011, data-model.md §"Identity allocation", constitution VI.
+      Fixture `tests/fixtures/string-id-api.yaml`, `tests/integration/string-identity.test.ts` and
+      `tests/unit/identity.test.ts` added before the code (red → green).
+- [X] T052 Honour a **cursor token** as an opaque start-after marker, with or without a companion
+      limit (FR-007, `contradicts`). `pagingStyle` only engaged the cursor branch when a limit was
+      also present, and the target API's measured cursor spelling (`paginationToken`, docs/05 §1)
+      was classified as a *filter*, so a conforming client's page request answered `[]` — data loss,
+      not cosmetics; with a limit the token did not move the window. Fixed by classifying the
+      token spellings as `paging`, treating a token as a paging instruction on its own, resolving it
+      to a start-after window in SQLite (`Store.listPaged` `after`, a `ROW_NUMBER()` window so the
+      page is still assembled by the database), and answering the operation's declared client error
+      for a token that names no record rather than a silent empty page. Source: FR-007,
+      docs/05-target-apis.md §1 (Q4 pagination). Fixture `tests/fixtures/cursor-api.yaml` and
+      `tests/integration/cursor.test.ts` added before the code (red → green).
+- [X] T053 Bind the cursor-window SQL placeholders in **text order** (FR-007, `contradicts`).
+      `SqliteStore.listPaged`'s cursor branch built `[...filterBindings, ...orderBindings,
+      query.after, ...orderBindings]`, but the SQL text orders placeholders `OVER (ORDER BY
+      <sorts>)`, then `WHERE <filters>`, then the cursor `id = ?`: the filter and sort groups were
+      swapped and every sort value was duplicated, so any cursor request that ALSO carried the
+      document's declared `sort` answered an undeclared `500 "Too many parameter values were
+      provided"` — the F-C fix's own failure mode (data loss dressed up as an error), one request
+      shape away from the shipped fixture. Fixed by binding in text order (`[...orderBindings,
+      ...filterBindings, query.after]`, mirroring the correctly-ordered non-cursor branch).
+      Fixture `tests/fixtures/cursor-api.yaml` gained declared `sort` and `group` parameters;
+      `tests/integration/cursor.test.ts` gained two tests asserting window CONTENT under the sort
+      and under filter+sort+cursor (not just status), added before the code (red → green). The
+      pre-existing cursor tests declared no sort, which is why the corruption went unseen. Source:
+      FR-007, plan.md → "Derivation rules" → List semantics. Deferred: **F-E**, `src/spec/identity.ts`
+      maps open quantifiers (`+`/`*`/`{n,}`) to exactly one unit — `^W-[0-9]+$` silently allocates
+      `W-0..W-9` then 500 `UNIQUE` at create #11 with `ambiguities: []` (expected
+      `identity-pattern-unsupported` per VI); owner: engineer, next converge.

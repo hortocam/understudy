@@ -18,6 +18,7 @@ import type {
   RelationshipHint,
   Resource,
 } from "./types.js";
+import { patternSupported } from "./identity.js";
 
 const EVIDENCE_RANK: Record<RelationshipEvidence, number> = {
   configured: 4,
@@ -124,7 +125,29 @@ function requestSchema(operation: Record<string, unknown>): unknown {
 function classifyParam(name: string): ListParamKind {
   const n = name.toLowerCase();
   if (
-    ["limit", "offset", "page", "size", "pagesize", "per_page", "per-page", "cursor", "start", "count"].includes(n)
+    [
+      "limit",
+      "offset",
+      "page",
+      "size",
+      "pagesize",
+      "maxpagesize",
+      "page_size",
+      "per_page",
+      "per-page",
+      "perpage",
+      "cursor",
+      "start",
+      "count",
+      // Cursor-token spellings measured on the target API (docs/05-target-apis.md §1:
+      // `paginationToken` ×21). A token misread as a filter makes a conforming client's
+      // page request answer `[]` (FR-007).
+      "paginationtoken",
+      "nextpagetoken",
+      "pagetoken",
+      "page_token",
+      "token",
+    ].includes(n)
   ) {
     return "paging";
   }
@@ -257,7 +280,11 @@ function deriveResource(
   const listOp = findMethod(collectionOps, "GET");
   const createOp = findMethod(collectionOps, "POST");
   const readOp = findMethod(instanceOps, "GET");
-  const updateOp = findMethod(instanceOps, "PATCH") ?? findMethod(instanceOps, "PUT");
+  // FR-006: PATCH (merge) and PUT (replace) are *different declared styles*, not two spellings
+  // of one update. A document may live both on one instance path, so each keeps its own slot;
+  // collapsing them (`PATCH ?? PUT`) left PUT live but unbound and silently swallowed.
+  const patchOp = findMethod(instanceOps, "PATCH");
+  const putOp = findMethod(instanceOps, "PUT");
   const deleteOp = findMethod(instanceOps, "DELETE");
 
   const representationSchema =
@@ -311,7 +338,8 @@ function deriveResource(
     ...(listOp ? { list: operationRef(listOp) } : {}),
     ...(createOp ? { create: operationRef(createOp) } : {}),
     ...(readOp ? { read: operationRef(readOp) } : {}),
-    ...(updateOp ? { update: operationRef(updateOp) } : {}),
+    ...(patchOp ? { update: operationRef(patchOp) } : {}),
+    ...(putOp ? { replace: operationRef(putOp) } : {}),
     ...(deleteOp ? { delete: operationRef(deleteOp) } : {}),
   };
 
@@ -330,8 +358,24 @@ function deriveResource(
     const createSchema = requestSchema(createOp.operation);
     if (createSchema !== undefined) resource.createSchema = createSchema;
   }
-  if (updateOp) resource.updateMode = updateOp.method === "PATCH" ? "merge" : "replace";
-  if (idPattern !== undefined) resource.idPattern = idPattern;
+  // data-model.md §1 names a single `updateMode`; with BOTH styles declared on one instance
+  // path there is no single style, so it is left unset and both are named in `operations`
+  // (`update` = merge, `replace` = replace). The mock decides per operation, not per resource.
+  if (patchOp && !putOp) resource.updateMode = "merge";
+  else if (putOp && !patchOp) resource.updateMode = "replace";
+  if (idPattern !== undefined) {
+    resource.idPattern = idPattern;
+    // FR-011 / principle VI: a declared pattern the bounded identity generator cannot satisfy
+    // must be reported, not answered with a non-conforming value.
+    if (idType === "string" && !patternSupported(idPattern)) {
+      ambiguities.push({
+        kind: "identity-pattern-unsupported",
+        path: instance?.instancePath ?? collectionPath,
+        ...(readOp?.operationId !== undefined ? { operationId: readOp.operationId } : {}),
+        detail: `${name} declares identity pattern ${idPattern}, which the mock's generator cannot satisfy; identities fall back to an opaque short id`,
+      });
+    }
+  }
   return resource;
 }
 

@@ -41,6 +41,22 @@ export interface StoreOptions {
   path: string;
 }
 
+/**
+ * A list read the CRUD engine asks the store for: filter, sort and page in one step.
+ *
+ * `after` is a cursor token — the identity of the last record a caller saw — and the read
+ * returns the records that follow it in the collection's order (FR-007). Resolving the token
+ * to a position is the store's job: it owns the row order, so a cursor page is never
+ * assembled by loading the collection into JS.
+ */
+export interface ListQuery {
+  filters?: Array<{ field: string; value: string | number | boolean }>;
+  sort?: Array<{ field: string; direction: "asc" | "desc" }>;
+  offset?: number;
+  limit?: number;
+  after?: string;
+}
+
 export interface Store {
   readonly path: string;
 
@@ -56,6 +72,12 @@ export interface Store {
   insert(resource: string, identity: string, data: unknown, origin?: Origin): StoredRecord;
   readOne(resource: string, identity: string): StoredRecord | undefined;
   list(resource: string): StoredRecord[];
+  /**
+   * A filtered, sorted and paged read, executed by the store so a page never loads the
+   * whole collection into memory (FR-007, T025). `sort`/`filters` name the document's own
+   * properties.
+   */
+  listPaged(resource: string, query?: ListQuery): StoredRecord[];
   update(resource: string, identity: string, data: unknown): StoredRecord | undefined;
   delete(resource: string, identity: string): boolean;
 

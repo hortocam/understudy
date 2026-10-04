@@ -1,0 +1,96 @@
+openapi: 3.1.0
+info:
+  title: Paged API
+  version: 1.0.0
+  description: >
+    A second fixture exercising a paging style distinct from inventory-api.yaml's offset/limit:
+    page/size. It also declares a sort parameter and a filter parameter, so list.ts can be
+    proven to honour all three of FR-007's concerns.
+paths:
+  /widgets:
+    get:
+      operationId: listWidgets
+      summary: List widgets, page/size paged
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1 }
+        - name: size
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1 }
+        - name: sort
+          in: query
+          required: false
+          schema: { type: string }
+        - name: colour
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: The widgets
+          content:
+            application/json:
+              schema:
+                type: array
+                title: Widget
+                items: { $ref: "#/components/schemas/Widget" }
+    post:
+      operationId: createWidget
+      summary: Create a widget
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WidgetCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Widget" }
+  /widgets/{id}:
+    get:
+      operationId: getWidget
+      summary: Read one widget
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: The widget
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Widget" }
+        "404":
+          description: No widget with that identity
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+components:
+  schemas:
+    Widget:
+      type: object
+      title: Widget
+      required: [id, colour]
+      properties:
+        id: { type: integer }
+        colour: { type: string }
+    WidgetCreate:
+      type: object
+      title: WidgetCreate
+      required: [colour]
+      additionalProperties: false
+      properties:
+        colour: { type: string }
+    Error:
+      type: object
+      title: Error
+      required: [error, message]
+      properties:
+        error: { type: string }
+        message: { type: string }

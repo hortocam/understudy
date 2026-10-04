@@ -6,11 +6,13 @@
  * contain, the whole selection is refused by name.
  */
 import { EmptySelectionError, UnknownOperationError } from "../errors.js";
-import type { DocumentOperation, SelectionResult } from "./types.js";
+import type { DocumentOperation, ResolvedSelectionEntry, SelectionResult, SelectorForm } from "./types.js";
 
-export type { DocumentOperation, SelectionResult } from "./types.js";
+export type { DocumentOperation, ResolvedSelectionEntry, SelectionResult, SelectorForm } from "./types.js";
 
 const HTTP_METHODS = ["get", "put", "post", "delete", "patch", "head", "options"] as const;
+
+const METHOD_PATH = /^(GET|PUT|POST|DELETE|PATCH|HEAD|OPTIONS)\s+\/.+$/;
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -40,15 +42,20 @@ export function operationKey(operation: DocumentOperation): string {
   return `${operation.method} ${operation.path}`;
 }
 
-function findMatches(operations: DocumentOperation[], entry: string): DocumentOperation[] {
-  const parts = entry.split(/\s+/);
-  if (parts.length === 2) {
-    const [method, path] = parts as [string, string];
-    const upper = method.toUpperCase();
-    const matches = operations.filter((op) => op.method === upper && op.path === path);
-    if (matches.length > 0) return matches;
+/**
+ * The form an entry is written in, decided by its spelling alone — neither form is a
+ * fallback for the other, so an entry never "tries" the other form (FR-002, A2).
+ */
+export function selectorForm(entry: string): SelectorForm {
+  return METHOD_PATH.test(entry.trim()) ? "method-path" : "operationId";
+}
+
+function findMatches(operations: DocumentOperation[], entry: string, form: SelectorForm): DocumentOperation[] {
+  if (form === "method-path") {
+    const [method, path] = entry.trim().split(/\s+/) as [string, string];
+    return operations.filter((op) => op.method === method.toUpperCase() && op.path === path);
   }
-  return operations.filter((op) => op.operationId !== undefined && op.operationId === entry);
+  return operations.filter((op) => op.operationId !== undefined && op.operationId === entry.trim());
 }
 
 /**
@@ -66,9 +73,11 @@ export function selectOperations(
   const all = collectOperations(document);
   const live: DocumentOperation[] = [];
   const liveKeys = new Set<string>();
+  const resolved: ResolvedSelectionEntry[] = [];
 
   for (const entry of selection) {
-    const matches = findMatches(all, entry);
+    const form = selectorForm(entry);
+    const matches = findMatches(all, entry, form);
     if (matches.length === 0) throw new UnknownOperationError(entry);
     for (const match of matches) {
       const key = operationKey(match);
@@ -76,9 +85,13 @@ export function selectOperations(
         liveKeys.add(key);
         live.push(match);
       }
+      const record: ResolvedSelectionEntry = { entry, form, methodPath: key };
+      if (match.operationId !== undefined) record.operationId = match.operationId;
+      resolved.push(record);
     }
   }
 
   const notImplemented = all.filter((op) => !liveKeys.has(operationKey(op)));
-  return { live, notImplemented };
+  const forms = [...new Set(resolved.map((record) => record.form))];
+  return { live, notImplemented, resolved, mixed: forms.length > 1, forms };
 }

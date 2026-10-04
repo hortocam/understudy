@@ -9,7 +9,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
 import { StoreUnwritableError } from "../errors.js";
-import type { Origin, RequestLogEntry, Store, StoreOptions, StoredRecord } from "./index.js";
+import type { ListQuery, Origin, RequestLogEntry, Store, StoreOptions, StoredRecord } from "./index.js";
 import {
   META_DDL,
   META_TABLE,
@@ -127,6 +127,72 @@ export class SqliteStore implements Store {
     const rows = this.#require()
       .prepare(`SELECT id, origin, doc, created_at, updated_at FROM ${quoteIdent(resource)} ORDER BY rowid`)
       .all() as RecordRow[];
+    return rows.map((row) => toRecord(resource, row));
+  }
+
+  listPaged(resource: string, query: ListQuery = {}): StoredRecord[] {
+    this.ensureResource(resource);
+    const table = quoteIdent(resource);
+    const columns = "id, origin, doc, created_at, updated_at";
+
+    const clauses: string[] = [];
+    const filterBindings: Array<string | number | boolean> = [];
+    // Filter and sort name the document's own properties, extracted from the JSON body
+    // with SQLite's JSON1 functions — the page is assembled by the database, so the
+    // collection never has to be materialised in JS to answer one page (FR-007, T025).
+    for (const filter of query.filters ?? []) {
+      clauses.push(`json_extract(doc, ?) = ?`);
+      filterBindings.push(`$.${filter.field}`, filter.value);
+    }
+
+    const order: string[] = [];
+    const orderBindings: string[] = [];
+    for (const sort of query.sort ?? []) {
+      order.push(`json_extract(doc, ?) ${sort.direction === "desc" ? "DESC" : "ASC"}`);
+      orderBindings.push(`$.${sort.field}`);
+    }
+    order.push("rowid ASC");
+    const where = clauses.length > 0 ? ` WHERE ${clauses.join(" AND ")}` : "";
+    const orderSql = order.join(", ");
+
+    if (typeof query.after === "string") {
+      // Cursor paging (FR-007): the token is the identity of the last record the caller saw;
+      // the page is the rows that *follow* it in the collection's declared order. A window
+      // function gives the token's position under that order (any direction), so the window
+      // moves and the collection is never loaded into JS to answer one page.
+      let sql =
+        `WITH ordered AS (SELECT ${columns}, ROW_NUMBER() OVER (ORDER BY ${orderSql}) AS __rn FROM ${table}${where}),` +
+        ` cursor AS (SELECT __rn FROM ordered WHERE id = ?)` +
+        ` SELECT ${columns} FROM ordered WHERE __rn > (SELECT __rn FROM cursor) ORDER BY __rn`;
+      // Bindings follow the SQL text order exactly: the window's ORDER BY sorts (inside
+      // `OVER (...)`), then the WHERE filters, then the cursor id (`WHERE id = ?`). Mixing the
+      // groups or repeating one makes SQLite bind a filter value to a `json_extract` path
+      // argument — an undeclared 500 for any cursor request that also sorts (F-D).
+      const bindings: Array<string | number | boolean> = [...orderBindings, ...filterBindings, query.after];
+      if (typeof query.limit === "number") {
+        sql += " LIMIT ?";
+        bindings.push(query.limit);
+        if (typeof query.offset === "number" && query.offset > 0) {
+          sql += " OFFSET ?";
+          bindings.push(query.offset);
+        }
+      }
+      const rows = this.#require().prepare(sql).all(...bindings) as RecordRow[];
+      return rows.map((row) => toRecord(resource, row));
+    }
+
+    let sql = `SELECT ${columns} FROM ${table}${where} ORDER BY ${orderSql}`;
+    const bindings: Array<string | number | boolean> = [...filterBindings, ...orderBindings];
+    if (typeof query.limit === "number") {
+      sql += " LIMIT ?";
+      bindings.push(query.limit);
+      if (typeof query.offset === "number" && query.offset > 0) {
+        sql += " OFFSET ?";
+        bindings.push(query.offset);
+      }
+    }
+
+    const rows = this.#require().prepare(sql).all(...bindings) as RecordRow[];
     return rows.map((row) => toRecord(resource, row));
   }
 

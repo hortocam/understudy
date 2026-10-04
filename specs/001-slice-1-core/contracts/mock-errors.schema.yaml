@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://understudy.dev/schemas/mock-errors.schema.json",
+  "title": "understudy mock error bodies",
+  "description": "The tool's OWN error contract. This is NOT the mocked surface: the mocked surface is derived from the user's OpenAPI document and must not gain tool-specific schemas. This document pins the one answer the tool produces on its own behalf — the not-implemented response (FR-003, SC-004), whose status is the exported constant NOT_IMPLEMENTED = 501 (RFC 9110 section 15.6.2) and whose body is NotImplementedBody.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$defs"],
+  "$defs": {
+    "NotImplementedBody": {
+      "title": "NotImplementedBody",
+      "description": "Body of the not-implemented response. `detail` names the unimplemented operation so a consumer can tell which operation this mock does not implement.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["error", "method", "path", "detail"],
+      "properties": {
+        "error": {
+          "type": "string",
+          "const": "not_implemented",
+          "description": "A stable short code, so a client can branch on it without parsing prose."
+        },
+        "method": {
+          "type": "string",
+          "description": "The HTTP method of the unimplemented operation, upper-cased."
+        },
+        "path": {
+          "type": "string",
+          "description": "The path template of the unimplemented operation, as the document declares it."
+        },
+        "operationId": {
+          "type": "string",
+          "description": "The document's operationId for the unimplemented operation, when it declares one."
+        },
+        "detail": {
+          "type": "string",
+          "description": "Human-readable, and names the unimplemented operation (method + path, plus operationId when present)."
+        }
+      }
+    }
+  }
+}

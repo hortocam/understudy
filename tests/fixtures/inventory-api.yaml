@@ -1,0 +1,174 @@
+openapi: 3.1.0
+info:
+  title: Inventory API
+  version: 1.0.0
+  description: >
+    The slice-1 acceptance fixture. One collection with the five CRUD operations, plus one
+    operation the mock is deliberately not asked to serve. It declares its own not-found
+    status explicitly (404 on GET /inventory/{id}) so the not-implemented answer can be
+    asserted to differ from a DECLARED status rather than a hard-coded one.
+paths:
+  /inventory:
+    get:
+      operationId: listInventory
+      summary: List the inventory
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1 }
+        - name: offset
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0 }
+        - name: sku
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: The inventory
+          content:
+            application/json:
+              schema:
+                type: array
+                title: Inventory
+                items: { $ref: "#/components/schemas/Inventory" }
+    post:
+      operationId: createInventory
+      summary: Create an inventory record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InventoryCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Inventory" }
+        "400":
+          description: The request body violates the document
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /inventory/{id}:
+    get:
+      operationId: getInventoryById
+      summary: Read one inventory record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: The record
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Inventory" }
+        "404":
+          description: No inventory record with that identity
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    patch:
+      operationId: updateInventory
+      summary: Update one inventory record (merge)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InventoryPatch" }
+      responses:
+        "200":
+          description: The updated record
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Inventory" }
+        "400":
+          description: The request body violates the document
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: No inventory record with that identity
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    delete:
+      operationId: deleteInventory
+      summary: Delete one inventory record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: No inventory record with that identity
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /events:
+    get:
+      operationId: listEvents
+      summary: List events — deliberately not selected by the mock
+      responses:
+        "200":
+          description: The events
+          content:
+            application/json:
+              schema:
+                type: array
+                title: Event
+                items: { $ref: "#/components/schemas/Event" }
+components:
+  schemas:
+    Inventory:
+      type: object
+      title: Inventory
+      required: [id, sku, quantity]
+      properties:
+        id: { type: integer }
+        sku: { type: string, minLength: 1 }
+        quantity: { type: integer, minimum: 0 }
+        notes: { type: [string, "null"] }
+    InventoryCreate:
+      type: object
+      title: InventoryCreate
+      required: [sku, quantity]
+      additionalProperties: false
+      properties:
+        sku: { type: string, minLength: 1 }
+        quantity: { type: integer, minimum: 0 }
+        notes: { type: [string, "null"] }
+    InventoryPatch:
+      type: object
+      title: InventoryPatch
+      additionalProperties: false
+      properties:
+        sku: { type: string, minLength: 1 }
+        quantity: { type: integer, minimum: 0 }
+        notes: { type: [string, "null"] }
+    Error:
+      type: object
+      title: Error
+      required: [error, message]
+      properties:
+        error: { type: string }
+        message: { type: string }
+    Event:
+      type: object
+      title: Event
+      properties:
+        id: { type: integer }
+        kind: { type: string }
