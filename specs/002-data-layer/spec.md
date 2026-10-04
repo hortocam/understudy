@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-03
 
-**Status**: Draft
+**Status**: Draft — amended 2026-10-04 against `docs/05-target-apis.md` (measured vendor facts)
 
 **Input**: Handoff package `docs/`. Slice 2 of seven; source material is
 `docs/01-product-spec.md` §4 Epic C (C1–C8) and §5 FR-008–FR-013, `docs/02-architecture.md` §3
@@ -227,6 +227,13 @@ falls to the next rule in the documented order; repeat down the chain and confir
   or folder, loadable without the others being present.
 - **FR-002**: Fixture configuration (fixed records and lookup tables) MUST be applied identically
   on every run and MUST NEVER be modified by generation, import, or activity over the mocked API.
+  Fixture configuration MUST be selected against the same operation-selection grammar the core
+  slice delivers: an operation is named by `operationId` when the document declares one, otherwise
+  by `METHOD /path`, and tag selectors MUST be accepted, including tag names containing a space
+  (`Market Orders` — normalised to `Market_Orders` in configuration, with the raw form also
+  accepted and an ambiguity refused by name). Against the measured target document, **0 of 224
+  operations declare an `operationId`**, so `METHOD /path` is the only universal selector and tags
+  are the ergonomic one; fixture configuration MUST NOT assume `operationId` is available.
 - **FR-003**: Generation configuration MUST be selectable by name ("recipe") so that several
   datasets (a small one for continuous integration, a large one for load) can coexist in one
   project and be chosen at start.
@@ -243,6 +250,14 @@ falls to the next rule in the documented order; repeat down the chain and confir
   between them, using this order of evidence, and MUST record which source each link came from:
   (1) explicit configuration, (2) a declared extension in the specification, (3) a naming
   convention (configurable rules), (4) implied nesting in the schemas.
+  **A naming-convention hit is evidence enough to *propose* a link, never to *decide* one when it
+  is ambiguous.** The tool MUST detect when the convention is not decisive — a property name that
+  denotes a different external entity per collection, or two sibling properties that could both be
+  the link — and MUST record the tie as an undetermined link in the startup report (FR-007) rather
+  than resolving it by a fixed priority. Measured against the target document, this is the common
+  case, not the edge case: `externalId` occurs **45 times** and denotes a different external system
+  per collection, and `eventId` / `viagogoEventId` / `primaryEventId` coexist on the same
+  resources.
 - **FR-007**: The startup report MUST list every derived collection, every derived link with its
   evidence source, and every link the tool could not determine confidently; an undetermined link
   MUST NOT be resolved silently.
@@ -275,12 +290,24 @@ falls to the next rule in the documented order; repeat down the chain and confir
 
 - **FR-015**: The tool MUST support an absolute record count for a collection and a count relative
   to a parent collection given as a range, optionally with a stated distribution.
+  **Generation MUST be able to produce a dataset large enough to exercise the document's declared
+  paging.** Against the measured target, paging is a **cursor inside the response schema**
+  (`paginationToken` on 21 operations) with a size cap (`maxPageSize` on 18) — not the offset/limit
+  or page/size envelope forms — so a generated collection with more records than a page MUST list
+  as a page carrying a continuation token, and the count and the paging style MUST agree.
 - **FR-016**: The tool MUST produce identical records — identity and values — for the same seed,
   configuration, fixtures and specification, and MUST be unaffected by the addition of an unrelated
   collection (per-collection derivation of the seed).
 - **FR-017**: The tool MUST allocate generated identities from a range reserved per collection,
   distinct from fixture identities, MUST produce them in the form the specification declares, and
   MUST refuse to start when configured ranges overlap.
+  **A reserved "range" is a span over whatever identity space the document declares, which is not
+  always an integer.** Against the measured target, identity types are mixed *within one document* —
+  `integer<int64>` (78), `string` (36), `integer<int32>` (30), `string<uuid>` (29) — and
+  vendor-prefixed string identifiers occur on the wrong-vendor's API (`viagogoEventId` on a StubHub
+  document). Reserved-range logic MUST therefore cover integer, uuid and prefixed-string identity
+  spaces, and an identity space the tool cannot reserve within MUST be reported rather than
+  guessed at.
 - **FR-018**: Records written over the mocked API MUST receive identities that cannot collide with
   fixture or generated identities.
 - **FR-019**: Generated values that depend on the current time MUST be reproducible: any
@@ -351,14 +378,20 @@ falls to the next rule in the documented order; repeat down the chain and confir
   in this slice arrive from fixtures or from generation.
 - **The time-derived-field question is settled conservatively:** a real clock is the default, and
   any field derived from it is recorded so exports can be compared; a fully virtual clock is
-  slice 6. The startup report states which mode is in force.
+  slice 6. The startup report states which mode is in force. This slice introduces the clock as an
+  **extension seam** (constitution X) — an interface with the real-clock implementation behind it —
+  so slice 6 adds the virtual clock without rework.
 - **The plausible-value heuristic** is built on a well-known fake-data library plus the
   specification's own declared formats and examples; the exact library is chosen in `plan.md`.
   Its outputs are *heuristic*, which is why the report must say when it was used (FR-010).
-- **The real vendor specification is still unavailable**; validation of inference against it remains
-  a spike (`docs/04` Q6), now scheduled inside this slice since inference is its subject. The
-  outcome of the spike is recorded in `plan.md` research, and the fixture documents stand in until
-  then.
+- **The real vendor specification is available and is a required input, not a deferred spike.**
+  `docs/05-target-apis.md` §1 records it live, public and credential-free: the StubHub Point of Sale
+  document (**165 paths, 224 operations**, OpenAPI 3.0.1, sha256 recorded). Deriving collections,
+  links, identity spaces and paging against **that document** — not only a five-operation fixture —
+  is part of this slice, because inference is its subject; the spike is no longer "scheduled", it is
+  the work. It is **not vendored** (redistribution terms unsettled), so it is fetched on demand and
+  CI MUST NOT depend on it being present; the fixture documents stand in for CI. The derivation's
+  outcome is recorded in `plan.md` research.
 - **Identity format follows the specification** (integer, string, or formatted identifier). The
   handoff's open question about vendor-prefixed identifiers (`docs/04` Q5) is answered
   conservatively: the tool produces whatever form the document declares and reserves a range inside
@@ -376,3 +409,52 @@ falls to the next rule in the documented order; repeat down the chain and confir
 - `docs/03-config-reference.md` — the draft configuration formats this slice must reconcile; the
   delivered configuration schema is expected to differ in detail and the differences must be
   recorded in `plan.md`.
+- `docs/05-target-apis.md` — the **measured** vendor facts this slice's inference now depends on
+  (operation selection, identity spaces, paging style, relationship collisions, the registrable
+  `Webhook` collection). Its §4 table is the authoritative list of assumptions it replaces.
+
+---
+
+## Amendment 2026-10-04 — A1: align the slice-2 spec with the measured vendor facts
+
+**Approved by:** the project owner (human), 2026-10-04. **Recorded by:** the coordinator, before the
+slice-2 plan was generated.
+
+**Why.** This spec was drafted 2026-10-03, when `docs/04` listed the vendor specification as
+unavailable (Q6 open, "run the inference against the actual spec early"). On 2026-10-04
+`docs/05-target-apis.md` measured the real StubHub document directly and answered Q4, Q5 and Q6.
+Six places in this spec are now stale or under-specified against measurable fact. This is a
+**PATCH-class** amendment: no principle is removed or redefined and no new requirement is
+invented — each change pins an existing MUST to facts that make it testable.
+
+| # | Requirement | Was | Now |
+|---|---|---|---|
+| A | Assumptions → vendor spec | "still unavailable"; spike deferred; fixtures stand in | available, live, public; derivation against it **is** the slice's work; not vendored, CI uses fixtures |
+| B | FR-006 | evidence order (naming convention at rank 3) implies a decisive pick | a convention hit **proposes**, never decides, when ambiguous; ties go to the report as undetermined |
+| C | FR-015 | absolute/relative counts, distribution | generation must also exercise the document's **declared paging** (cursor-in-schema + size cap) |
+| D | FR-017 | reserved ranges, "in the form the specification declares" | ranges span **integer / uuid / prefixed-string** identity spaces; an unreservable space is reported, not guessed |
+| E | FR-002 | fixture config applies identically each run | fixture selection uses the core slice's selection grammar; **0/224 operations have an `operationId`**, so `METHOD /path`/tags are the usable selectors |
+| F | Assumptions + Dependencies | `docs/04` Q9 open; webhook surface unaddressed | the vendor `Webhook` tag is an ordinary registrable **CRUD** collection (mocked like any other); only webhook **delivery** stays slice 4 |
+
+**The pinned facts** (an implementer must not have to re-derive these; all measured, source
+`docs/05`):
+
+1. **Selection.** Target document: 165 paths, 224 operations, **0** declaring an `operationId`;
+   every operation carries one of 28 tags; one tag contains a space (`Market Orders`); no top-level
+   `tags` array.
+2. **Relationships.** FK-looking names follow `<Entity>Id` camelCase (70 distinct), with real
+   collisions: `externalId` ×45 (different external system per entity), and
+   `eventId`/`viagogoEventId`/`primaryEventId` coexisting.
+3. **Paging.** Query-parameter driven, **cursor in the response schema**: `paginationToken` (×21) +
+   `maxPageSize` (×18); only five component schemas carry wrapper fields. Not offset/limit or
+   page/size.
+4. **Identity.** Mixed *within one document*: `integer<int64>` ×78, `string` ×36, `integer<int32>`
+   ×30, `string<uuid>` ×29; vendor-prefixed strings are real (`viagogoEventId` on a StubHub API).
+5. **Webhook surface.** `/webhooks` is a CRUD collection (register/list/get/update/delete) plus
+   `GET /webhooks/topics` and `/subtopics` reference data; `409 Conflict` on create is the first
+   non-404 declared error in the target set — a good declared-error rendering case.
+
+**Scope fence.** This amendment authorises changes to the six rows above **and nothing else**. It
+does not authorise implementation code (the plan and tasks land separately under the normal
+spec→plan→tasks checkpoints), does not move webhook *delivery* into this slice, and does not touch
+slice 1's specification or its contracts.
