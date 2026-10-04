@@ -157,6 +157,17 @@ slice-4 concern in one file. `data/` sits beside `spec/` and depends on it (gene
 derived model) while `spec/` never depends on `data/`, so the derivation stays testable without a
 store.
 
+**Known integration point — the config contract's location.** `scripts/generate-config-schema.mjs`
+currently hardcodes the contract path to `specs/001-slice-1-core/contracts/config.schema.yaml` and
+compiles it into `src/config/schema.generated.ts`; `tests/unit/config.test.ts` is the drift check
+that keeps the copy honest. Slice 2's contract therefore does **not** reach the build until that
+generator is repointed. Because the constitution says amendments **extend and never rewrite
+history**, slice 2's contract file is the new authoritative one and a slice-2 task repoints both the
+generator and the drift test at `specs/002-data-layer/contracts/config.schema.yaml` (slice 1's file
+stays as history, not deleted, not edited). This is the one place the slice-2 work must touch a
+slice-1 artifact's downstream, and it is why the repoint is named in `tasks.md` rather than left to
+be discovered.
+
 ## Derivation rules (what is inferred, and what is refused)
 
 Principle VI demands inference be explicit, reported and pinnable. Slice 1 derived the *shape*; this

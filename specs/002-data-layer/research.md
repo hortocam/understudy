@@ -162,3 +162,11 @@ Carried forward, each with a home:
   behind it.
 - **Tenant scoping, authentication on the mock surface** — `docs/04` Q11/Q12, still open; the mocked
   surface remains open as in slice 1.
+- **The config contract's location and the schema generator** — the build currently compiles
+  `specs/001-slice-1-core/contracts/config.schema.yaml` into `src/config/schema.generated.ts` by a
+  hardcoded path (`scripts/generate-config-schema.mjs`), guarded by the drift test in
+  `tests/unit/config.test.ts`. Slice 2's contract is the authoritative one going forward, so a task
+  in this slice **repoints the generator and the drift test** at
+  `specs/002-data-layer/contracts/config.schema.yaml`; slice 1's file stays in place as history. This
+  is an implementation task, not a planning one, but it is named here so it is not discovered late
+  (see `plan.md` → Project Structure, "Known integration point").
