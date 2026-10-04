@@ -396,3 +396,20 @@ Append-only: no existing task above is modified.
       for a token that names no record rather than a silent empty page. Source: FR-007,
       docs/05-target-apis.md §1 (Q4 pagination). Fixture `tests/fixtures/cursor-api.yaml` and
       `tests/integration/cursor.test.ts` added before the code (red → green).
+- [X] T053 Bind the cursor-window SQL placeholders in **text order** (FR-007, `contradicts`).
+      `SqliteStore.listPaged`'s cursor branch built `[...filterBindings, ...orderBindings,
+      query.after, ...orderBindings]`, but the SQL text orders placeholders `OVER (ORDER BY
+      <sorts>)`, then `WHERE <filters>`, then the cursor `id = ?`: the filter and sort groups were
+      swapped and every sort value was duplicated, so any cursor request that ALSO carried the
+      document's declared `sort` answered an undeclared `500 "Too many parameter values were
+      provided"` — the F-C fix's own failure mode (data loss dressed up as an error), one request
+      shape away from the shipped fixture. Fixed by binding in text order (`[...orderBindings,
+      ...filterBindings, query.after]`, mirroring the correctly-ordered non-cursor branch).
+      Fixture `tests/fixtures/cursor-api.yaml` gained declared `sort` and `group` parameters;
+      `tests/integration/cursor.test.ts` gained two tests asserting window CONTENT under the sort
+      and under filter+sort+cursor (not just status), added before the code (red → green). The
+      pre-existing cursor tests declared no sort, which is why the corruption went unseen. Source:
+      FR-007, plan.md → "Derivation rules" → List semantics. Deferred: **F-E**, `src/spec/identity.ts`
+      maps open quantifiers (`+`/`*`/`{n,}`) to exactly one unit — `^W-[0-9]+$` silently allocates
+      `W-0..W-9` then 500 `UNIQUE` at create #11 with `ambiguities: []` (expected
+      `identity-pattern-unsupported` per VI); owner: engineer, next converge.

@@ -21,6 +21,17 @@ paths:
           in: query
           required: false
           schema: { type: integer, minimum: 1 }
+        # Declared alongside the cursor so the suite exercises the combined
+        # sort + filter + cursor binding class (F-D); a cursor fixture that declares no sort
+        # was blind to a placeholder mis-binding in the store's cursor branch.
+        - name: sort
+          in: query
+          required: false
+          schema: { type: string }
+        - name: group
+          in: query
+          required: false
+          schema: { type: string }
       responses:
         "200":
           description: The items
@@ -73,6 +84,7 @@ components:
       properties:
         id: { type: integer }
         name: { type: string }
+        group: { type: string }
     ItemInput:
       type: object
       title: ItemInput
@@ -80,6 +92,7 @@ components:
       additionalProperties: false
       properties:
         name: { type: string }
+        group: { type: string }
     Error:
       type: object
       title: Error

@@ -164,7 +164,11 @@ export class SqliteStore implements Store {
         `WITH ordered AS (SELECT ${columns}, ROW_NUMBER() OVER (ORDER BY ${orderSql}) AS __rn FROM ${table}${where}),` +
         ` cursor AS (SELECT __rn FROM ordered WHERE id = ?)` +
         ` SELECT ${columns} FROM ordered WHERE __rn > (SELECT __rn FROM cursor) ORDER BY __rn`;
-      const bindings: Array<string | number | boolean> = [...filterBindings, ...orderBindings, query.after, ...orderBindings];
+      // Bindings follow the SQL text order exactly: the window's ORDER BY sorts (inside
+      // `OVER (...)`), then the WHERE filters, then the cursor id (`WHERE id = ?`). Mixing the
+      // groups or repeating one makes SQLite bind a filter value to a `json_extract` path
+      // argument — an undeclared 500 for any cursor request that also sorts (F-D).
+      const bindings: Array<string | number | boolean> = [...orderBindings, ...filterBindings, query.after];
       if (typeof query.limit === "number") {
         sql += " LIMIT ?";
         bindings.push(query.limit);
