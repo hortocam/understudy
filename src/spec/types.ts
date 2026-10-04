@@ -12,9 +12,36 @@ export interface DocumentOperation {
   operation: Record<string, unknown>;
 }
 
+/** The two selector forms are peers (FR-002, amendment A2) — an entry's spelling decides. */
+export type SelectorForm = "method-path" | "operationId";
+
+/** How one configured selection entry resolved against the document (FR-023, A2). */
+export interface ResolvedSelectionEntry {
+  /** The raw entry exactly as the user wrote it. */
+  entry: string;
+  /** Which selector form resolved it. */
+  form: SelectorForm;
+  /** The resolved `METHOD /path`. */
+  methodPath: string;
+  operationId?: string;
+}
+
 export interface SelectionResult {
   live: DocumentOperation[];
   notImplemented: DocumentOperation[];
+  /** One record per configured entry, in selection order. */
+  resolved: ResolvedSelectionEntry[];
+  /** True when a selection uses both forms; FR-023 requires the report to say which form resolved each live operation. */
+  mixed: boolean;
+  /** The distinct forms this selection used. */
+  forms: SelectorForm[];
+}
+
+/** The selector-form summary the startup report carries (FR-023, A2). */
+export interface SelectionReport {
+  mixed: boolean;
+  forms: SelectorForm[];
+  resolved: ResolvedSelectionEntry[];
 }
 
 export interface OperationRef {
@@ -115,6 +142,8 @@ export interface StartupReport {
   clock: { mode: "real" };
   live: OperationRef[];
   notSelected: OperationRef[];
+  /** Which selector form resolved each live operation (FR-023; amendment A2). */
+  selection: SelectionReport;
   resources: Resource[];
   relationships: Relationship[];
   ambiguities: Ambiguity[];

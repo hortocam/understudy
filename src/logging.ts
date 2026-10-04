@@ -61,6 +61,17 @@ export function renderStartupReport(report: StartupReport): string {
   lines.push(`live operations (${report.live.length}):`);
   for (const op of report.live) lines.push(`  ${operationLabel(op)}`);
 
+  // FR-023 (amendment A2): when a selection mixes the two selector forms, say which form
+  // resolved each live operation. Printed only when there is a mix to explain, so the
+  // common single-form report is not noise.
+  if (report.selection.mixed) {
+    lines.push("");
+    lines.push(`selection resolved by two forms (${report.selection.forms.join(" + ")}):`);
+    for (const entry of report.selection.resolved) {
+      lines.push(`  ${entry.form}: "${entry.entry}" -> ${entry.methodPath}`);
+    }
+  }
+
   lines.push("");
   lines.push(`not selected (${report.notSelected.length}):`);
   for (const op of report.notSelected) lines.push(`  ${operationLabel(op)}`);

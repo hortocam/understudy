@@ -9,7 +9,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
 import { StoreUnwritableError } from "../errors.js";
-import type { Origin, RequestLogEntry, Store, StoreOptions, StoredRecord } from "./index.js";
+import type { ListQuery, Origin, RequestLogEntry, Store, StoreOptions, StoredRecord } from "./index.js";
 import {
   META_DDL,
   META_TABLE,
@@ -127,6 +127,45 @@ export class SqliteStore implements Store {
     const rows = this.#require()
       .prepare(`SELECT id, origin, doc, created_at, updated_at FROM ${quoteIdent(resource)} ORDER BY rowid`)
       .all() as RecordRow[];
+    return rows.map((row) => toRecord(resource, row));
+  }
+
+  listPaged(resource: string, query: ListQuery = {}): StoredRecord[] {
+    this.ensureResource(resource);
+    const clauses: string[] = [];
+    const bindings: Array<string | number | boolean> = [];
+
+    // Filter and sort name the document's own properties, extracted from the JSON body
+    // with SQLite's JSON1 functions — the page is assembled by the database, so the
+    // collection never has to be materialised in JS to answer one page (FR-007, T025).
+    for (const filter of query.filters ?? []) {
+      clauses.push(`json_extract(doc, ?) = ?`);
+      bindings.push(`$.${filter.field}`, filter.value);
+    }
+
+    let sql = `SELECT id, origin, doc, created_at, updated_at FROM ${quoteIdent(resource)}`;
+    if (clauses.length > 0) sql += ` WHERE ${clauses.join(" AND ")}`;
+
+    const order: string[] = [];
+    for (const sort of query.sort ?? []) {
+      order.push(`json_extract(doc, ?) ${sort.direction === "desc" ? "DESC" : "ASC"}`);
+      bindings.push(` $.${sort.field} `.trim());
+    }
+    order.push("rowid ASC");
+    sql += ` ORDER BY ${order.join(", ")}`;
+
+    if (typeof query.limit === "number") {
+      sql += " LIMIT ?";
+      bindings.push(query.limit);
+      if (typeof query.offset === "number" && query.offset > 0) {
+        sql += " OFFSET ?";
+        bindings.push(query.offset);
+      }
+    }
+
+    const rows = this.#require()
+      .prepare(sql)
+      .all(...bindings) as RecordRow[];
     return rows.map((row) => toRecord(resource, row));
   }
 

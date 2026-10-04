@@ -1,0 +1,276 @@
+/**
+ * The mocked surface: match a request against the live operations derived from the
+ * document, dispatch it to the CRUD engine, and answer everything else honestly
+ * (FR-002, FR-003, FR-005, FR-008; amendment A1).
+ *
+ * A single catch-all route does the matching by hand. That is deliberate: the spec
+ * distinguishes three outcomes — a live operation, a *declared but unselected* operation
+ * (`NOT_IMPLEMENTED`), and a path the document does not declare at all (plain 404) — and a
+ * framework's own router can only express two of them without inventing a fourth.
+ */
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
+import type { DerivedModel, DocumentOperation, Resource, ResourceOperations } from "../spec/types.js";
+import type { CrudContext } from "./crud.js";
+import { createRecord, deleteRecord, readRecord, updateRecord } from "./crud.js";
+import { listRecords } from "./list.js";
+import { collectOperations } from "../spec/operations.js";
+import { declaredClientStatus, NOT_IMPLEMENTED, notImplementedBody, renderDeclaredError } from "./errors.js";
+import { validateBody, validateParameters } from "./validate.js";
+
+export interface RouteContext {
+  document: Record<string, unknown>;
+  model: DerivedModel;
+  live: DocumentOperation[];
+  crud: CrudContext;
+  /** Prefix every mocked route behind this path (config `server.basePath`). */
+  basePath: string;
+}
+
+const HTTP_METHODS = ["get", "put", "post", "delete", "patch", "head", "options"] as const;
+
+interface PathRoute {
+  template: string;
+  regex: RegExp;
+  paramNames: string[];
+  methods: Set<string>;
+  /** Segment count, for specificity when two templates both match. */
+  depth: number;
+  /** Length of the template's literal characters, the second specificity tiebreak. */
+  literalLength: number;
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function compilePath(template: string): { regex: RegExp; paramNames: string[] } {
+  const paramNames: string[] = [];
+  const parts = template.split("/").map((segment) => {
+    const match = /^\{([^}]+)\}$/.exec(segment);
+    if (match) {
+      paramNames.push(match[1] as string);
+      return "([^/]+)";
+    }
+    return segment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  });
+  return { regex: new RegExp(`^${parts.join("/")}$`), paramNames };
+}
+
+function buildPathRoutes(document: Record<string, unknown>): PathRoute[] {
+  const paths = document.paths;
+  if (!isObject(paths)) return [];
+  const routes: PathRoute[] = [];
+  for (const [template, pathItem] of Object.entries(paths)) {
+    if (!isObject(pathItem)) continue;
+    const methods = new Set<string>();
+    for (const method of HTTP_METHODS) {
+      if (isObject(pathItem[method])) methods.add(method.toUpperCase());
+    }
+    if (methods.size === 0) continue;
+    const { regex, paramNames } = compilePath(template);
+    routes.push({
+      template,
+      regex,
+      paramNames,
+      methods,
+      depth: template.split("/").filter((segment) => segment.length > 0).length,
+      literalLength: template.replace(/\{[^}]+\}/g, "").length,
+    });
+  }
+  return routes;
+}
+
+interface OperationBinding {
+  resource: Resource;
+  kind: keyof ResourceOperations;
+  operation: DocumentOperation;
+}
+
+function bindOperations(model: DerivedModel, live: DocumentOperation[]): Map<string, OperationBinding> {
+  const bindings = new Map<string, OperationBinding>();
+  const byKey = new Map(live.map((operation) => [`${operation.method} ${operation.path}`, operation]));
+  for (const resource of model.resources) {
+    const entries = Object.entries(resource.operations) as Array<
+      [keyof ResourceOperations, { method: string; path: string }]
+    >;
+    for (const [kind, ref] of entries) {
+      const operation = byKey.get(`${ref.method} ${ref.path}`);
+      if (operation) bindings.set(`${ref.method} ${ref.path}`, { resource, kind, operation });
+    }
+  }
+  return bindings;
+}
+
+function declaredSuccess(operation: DocumentOperation): number {
+  const responses = operation.operation.responses;
+  if (!isObject(responses)) return 200;
+  const codes = Object.keys(responses)
+    .map(Number)
+    .filter((code) => code >= 200 && code < 300)
+    .sort((a, b) => a - b);
+  return codes[0] ?? 200;
+}
+
+/** The status and body for a missing record: the document's declared error status (FR-005). */
+function missingRecord(resource: Resource, operation: DocumentOperation, identity: string): { status: number; body: unknown } {
+  const message = `no ${resource.name} with identity ${identity}`;
+  const rendered = renderDeclaredError(operation.operation, declaredClientStatus(operation.operation, 404) ?? 404, {
+    code: "not_found",
+    message,
+  });
+  return rendered ?? { status: 404, body: { error: "not_found", message } };
+}
+
+/** The body when a request violates the document: the declared status and error shape (FR-008). */
+function invalidRequest(operation: DocumentOperation): { status: number; body: unknown } {
+  const message = "the request does not match the operation's declared schema";
+  const rendered = renderDeclaredError(operation.operation, declaredClientStatus(operation.operation, 400) ?? 400, {
+    code: "invalid_request",
+    message,
+  });
+  return rendered ?? { status: 400, body: { error: "invalid_request", message } };
+}
+
+interface ParsedBody {
+  value: unknown;
+  ok: boolean;
+}
+
+function parseJsonBody(body: unknown): ParsedBody {
+  if (body === undefined || body === null) return { value: undefined, ok: true };
+  if (typeof body !== "string") return { value: body, ok: true };
+  if (body.trim().length === 0) return { value: undefined, ok: true };
+  try {
+    return { value: JSON.parse(body) as unknown, ok: true };
+  } catch {
+    return { value: undefined, ok: false };
+  }
+}
+
+export function buildMockServer(context: RouteContext): FastifyInstance {
+  const server = Fastify({ logger: false });
+
+  // Bodies are read as text and parsed here, so a malformed JSON body produces the
+  // document's declared error rather than the framework's own error envelope (FR-008).
+  server.addContentTypeParser("application/json", { parseAs: "string" }, (_request, body, done) => {
+    done(null, body);
+  });
+
+  const pathRoutes = buildPathRoutes(context.document);
+  const liveKeys = new Set(context.live.map((operation) => `${operation.method} ${operation.path}`));
+  const declaredByKey = new Map(
+    collectOperations(context.document).map((operation) => [`${operation.method} ${operation.path}`, operation]),
+  );
+  const bindings = bindOperations(context.model, context.live);
+  const basePath = context.basePath.replace(/\/+$/, "");
+
+  const handle = async (request: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> => {
+    const rawPath = request.url.split("?")[0] ?? request.url;
+    if (basePath.length > 0 && rawPath !== basePath && !rawPath.startsWith(`${basePath}/`)) {
+      return reply.code(404).send({ error: "not_found", message: `no operation is declared for ${rawPath}` });
+    }
+    const path = basePath.length > 0 ? rawPath.slice(basePath.length) || "/" : rawPath;
+
+    // Most specific template first: an all-literal path beats a templated one.
+    const route = pathRoutes
+      .filter((candidate) => candidate.regex.test(path))
+      .sort((a, b) => a.depth - b.depth || b.literalLength - a.literalLength)[0];
+    const method = request.method.toUpperCase();
+
+    if (!route || !route.methods.has(method)) {
+      // No operation exists for this method+path, so there is no declared answer to render.
+      return reply.code(404).send({ error: "not_found", message: `no operation is declared for ${method} ${path}` });
+    }
+
+    const key = `${method} ${route.template}`;
+    if (!liveKeys.has(key)) {
+      // The operation exists in the document but was not selected (FR-003, SC-004).
+      return reply.code(NOT_IMPLEMENTED).send(notImplementedBody(declaredByKey.get(key) ?? { method, path: route.template }));
+    }
+
+    const binding = bindings.get(key);
+    if (!binding) {
+      // A live operation that matched no resource has no CRUD semantics to apply; answer the
+      // declared success status with an empty body rather than inventing a representation.
+      const status = declaredSuccess(declaredByKey.get(key) as DocumentOperation);
+      return reply.code(status).send(status === 204 ? undefined : {});
+    }
+
+    const params: Record<string, string> = {};
+    const match = route.regex.exec(path);
+    if (match) {
+      route.paramNames.forEach((name, index) => {
+        params[name] = match[index + 1] as string;
+      });
+    }
+    const identity = params[binding.resource.idField] ?? Object.values(params)[0] ?? "";
+
+    switch (binding.kind) {
+      case "list": {
+        const query = request.query as Record<string, string | undefined>;
+        const declared = Array.isArray(binding.operation.operation.parameters)
+          ? binding.operation.operation.parameters
+          : [];
+        const check = validateParameters(declared, "query", query);
+        if (!check.valid) {
+          const error = invalidRequest(binding.operation);
+          return reply.code(error.status).send(error.body);
+        }
+        return reply.code(declaredSuccess(binding.operation)).send(listRecords(context.crud, binding.resource, { query }));
+      }
+      case "create": {
+        const parsed = parseJsonBody(await request.body);
+        const check = parsed.ok ? validateBody(binding.operation.operation, parsed.value) : { valid: false, messages: [] };
+        if (!check.valid) {
+          const error = invalidRequest(binding.operation);
+          return reply.code(error.status).send(error.body);
+        }
+        const record = createRecord(context.crud, binding.resource, parsed.value);
+        const status = declaredSuccess(binding.operation);
+        return reply.code(status).send(status === 204 ? undefined : record);
+      }
+      case "read": {
+        const found = readRecord(context.crud, binding.resource, identity);
+        if (!found) {
+          const error = missingRecord(binding.resource, binding.operation, identity);
+          return reply.code(error.status).send(error.body);
+        }
+        return reply.code(declaredSuccess(binding.operation)).send(found);
+      }
+      case "update": {
+        const parsed = parseJsonBody(await request.body);
+        const check = parsed.ok ? validateBody(binding.operation.operation, parsed.value) : { valid: false, messages: [] };
+        if (!check.valid) {
+          const error = invalidRequest(binding.operation);
+          return reply.code(error.status).send(error.body);
+        }
+        const updated = updateRecord(context.crud, binding.resource, identity, parsed.value);
+        if (!updated) {
+          const error = missingRecord(binding.resource, binding.operation, identity);
+          return reply.code(error.status).send(error.body);
+        }
+        return reply.code(declaredSuccess(binding.operation)).send(updated);
+      }
+      case "delete": {
+        const removed = deleteRecord(context.crud, binding.resource, identity);
+        if (!removed) {
+          const error = missingRecord(binding.resource, binding.operation, identity);
+          return reply.code(error.status).send(error.body);
+        }
+        const status = declaredSuccess(binding.operation);
+        return reply.code(status).send(status === 204 ? undefined : {});
+      }
+      default: {
+        return reply.code(declaredSuccess(binding.operation)).send({});
+      }
+    }
+  };
+
+  server.all("/*", handle);
+  server.all("/", handle);
+  server.setErrorHandler((error, _request, reply) => {
+    reply.code(500).send({ error: "internal_error", message: error instanceof Error ? error.message : String(error) });
+  });
+
+  return server;
+}
