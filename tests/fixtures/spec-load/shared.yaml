@@ -1,0 +1,13 @@
+components:
+  schemas:
+    Widget:
+      type: object
+      title: Widget
+      properties:
+        id: { type: integer }
+        name: { type: string }
+    WidgetList:
+      type: array
+      title: WidgetList
+      items:
+        $ref: "#/components/schemas/Widget"

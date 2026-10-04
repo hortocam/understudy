@@ -1,0 +1,206 @@
+openapi: 3.1.0
+info:
+  title: Derivation API
+  version: 1.0.0
+x-understudy-relationships:
+  - from: Order
+    to: Warehouse
+    field: warehouseId
+paths:
+  /inventory:
+    get:
+      operationId: listInventory
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer }
+        - name: sort
+          in: query
+          required: false
+          schema: { type: string }
+        - name: name
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                title: Inventory
+                items: { $ref: "#/components/schemas/Inventory" }
+    post:
+      operationId: createInventory
+      responses:
+        "201":
+          description: created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Inventory" }
+  /inventory/{id}:
+    get:
+      operationId: getInventory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Inventory" }
+  /orders:
+    get:
+      operationId: listOrders
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                title: Order
+                items: { $ref: "#/components/schemas/Order" }
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+  /orders/{id}/lines:
+    get:
+      operationId: listOrderLines
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                title: OrderLine
+                items: { $ref: "#/components/schemas/OrderLine" }
+  /warehouses:
+    get:
+      operationId: listWarehouses
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                title: Warehouse
+                items: { $ref: "#/components/schemas/Warehouse" }
+  /warehouses/{id}:
+    get:
+      operationId: getWarehouse
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Warehouse" }
+  /suppliers:
+    get:
+      operationId: listSuppliers
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                title: Supplier
+                items: { $ref: "#/components/schemas/Supplier" }
+  /suppliers/{id}:
+    get:
+      operationId: getSupplier
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Supplier" }
+  /reports/{year}/{month}:
+    get:
+      operationId: getReport
+      parameters:
+        - name: year
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: month
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: ok
+  /pings:
+    get:
+      operationId: ping
+      responses:
+        "200":
+          description: ok
+components:
+  schemas:
+    Inventory:
+      type: object
+      title: Inventory
+      properties:
+        id: { type: integer }
+        name: { type: string }
+    Order:
+      type: object
+      title: Order
+      properties:
+        id: { type: integer }
+        inventoryId: { type: integer }
+        warehouseId: { type: string }
+        supplierId: { type: integer }
+    Warehouse:
+      type: object
+      title: Warehouse
+      properties:
+        id: { type: string }
+        name: { type: string }
+    Supplier:
+      type: object
+      title: Supplier
+      properties:
+        id: { type: integer }
+        name: { type: string }
+    OrderLine:
+      type: object
+      title: OrderLine
+      properties:
+        id: { type: integer }
+        sku: { type: string }
