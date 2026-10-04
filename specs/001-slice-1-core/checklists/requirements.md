@@ -103,4 +103,5 @@ There are no `[NEEDS CLARIFICATION]` markers: each of the three open questions t
 either has a reasonable default (recorded in Assumptions) or is explicitly deferred with a named
 home in a later slice, per the `speckit-specify` guidance of a maximum of three markers reserved
 for decisions that change scope, security or UX. `/speckit-clarify` is therefore optional for this
-feature; it is worthwhile only if Cameron wants the reset-mode or auth decisions pulled forward.
+feature; it is worthwhile only if the project owner wants the reset-mode or auth decisions pulled
+forward.

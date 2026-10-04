@@ -27,7 +27,7 @@ export const configSchema: Record<string, unknown> = {
       "items": {
         "type": "string",
         "pattern": "^(GET|PUT|POST|DELETE|PATCH|HEAD|OPTIONS)\\s+/.+$|^[A-Za-z_][A-Za-z0-9_]*$",
-        "description": "Either 'METHOD /path' or an operationId.",
+        "description": "Either 'METHOD /path' or an operationId. Both forms are peers: a document may support only one of them, so neither is a fallback.",
         "examples": [
           "POST /inventory",
           "getInventoryById"

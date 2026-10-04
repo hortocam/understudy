@@ -38,6 +38,7 @@ docs/            Handoff package — the source material for the specs
   02-architecture.md              components, data model, tech  (→ /speckit-plan)
   03-config-reference.md          draft config formats           (→ /speckit-clarify)
   04-phasing-and-open-questions.md  slices, deferrals, open questions (→ /speckit-constitution)
+  05-target-apis.md               the target vendor APIs, measured (→ /speckit-plan)
 src/             implementation (filled by the feature specs, not before)
 tests/           unit + integration + contract tests
 ```

@@ -85,7 +85,7 @@ Existing mock tools are stateless, example-driven, or require hand-written scrip
 | ID | Requirement |
 |---|---|
 | FR-001 | Load OpenAPI 3.0/3.1 specs (file or URL), resolving `$ref`s. |
-| FR-002 | Enable operations by `operationId` or `METHOD /path`; all others return 501. |
+| FR-002 | Enable operations by `operationId` or `METHOD /path` — both mandatory, neither a fallback; all others return 501. |
 | FR-003 | Validate request and response bodies, params, and headers against the spec. |
 | FR-004 | Implement generic Create/Read/List/Update(PATCH merge-patch, PUT replace)/Delete semantics with spec-defined status codes (201, 204, 400, 404, 409, …). |
 | FR-005 | Persist all state in an embedded database by default (SQLite); storage behind an interface. |

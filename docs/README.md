@@ -14,6 +14,10 @@ A tool that takes selected operations from an OpenAPI spec and serves a **statef
 | `02-architecture.md` | How: components, data model, generation pipeline, event bus, webhooks, actions, control API, CLI, tech choices | `/speckit.plan` input |
 | `03-config-reference.md` | Draft config file formats with examples (static / dynamic / imports / behavior) | `/speckit.plan` + `/speckit.clarify` input |
 | `04-phasing-and-open-questions.md` | Suggested delivery slices, deferred items, open decisions, constitution suggestions | `/speckit.constitution`, `/speckit.tasks` input |
+| `05-target-apis.md` | The two target vendor APIs, measured from live documents: selection grammar, identity types, paging, relationships, and the vendor's webhook-registration surface | `/speckit.plan` input for the data-layer slice |
+
+This directory is the **complete** source material for the project; it deliberately contains no
+pointer to any external notes repository, so a clone of this repo is self-sufficient.
 
 ## How to use with Spec Kit
 
