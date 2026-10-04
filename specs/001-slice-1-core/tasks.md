@@ -69,8 +69,10 @@ phase rather than distributed across the stories.
       content hash for `_understudy_meta`. No network access except a URL the user supplied
       (FR-001, FR-022).
 - [ ] T012 Implement `src/spec/operations.ts`: resolve the configured `operations` entries against
-      the document (by `operationId` or `METHOD /path`), producing the live set and the
-      not-implemented set; refuse the whole selection if any entry does not exist (FR-002, FR-004).
+      the document — each entry by `METHOD /path` **or** by `operationId`, the two forms being peers
+      with no precedence (A2) — producing the live set and the not-implemented set, and recording
+      which form resolved each entry for the startup report; refuse the whole selection if any entry
+      does not exist (FR-002, FR-004, FR-023).
 - [ ] T013 [P] Test for T011/T012 in `tests/unit/spec-load.test.ts`: a fixture document with an
       external `$ref` resolves; a 3.0 document and its 3.1 twin produce the same operations; an
       unknown selection entry is refused by name; a URL spec is never fetched when the path form
@@ -304,7 +306,7 @@ no existing task above is modified.
 
 ## Amendment 2026-10-04 — A1: pin the not-implemented response
 
-**Approved by:** Cameron (human). **Recorded by:** Jarvis (coordinator), before Phase 3 was dispatched.
+**Approved by:** the project owner (human). **Recorded by:** the coordinator, before Phase 3 was dispatched.
 
 **Why.** The not-implemented answer was written in prose in about eight artefacts (`docs/01` A3 and
 `docs/01` FR-002, `docs/02`, `docs/03`, `spec.md` FR-002/FR-003, `quickstart.md` §5, `data-model.md`

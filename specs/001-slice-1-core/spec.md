@@ -134,6 +134,12 @@ human can act on.
 - **No operations selected**, or a selection naming an operation the document does not contain:
   reported at startup; an empty selection is refused with an explanation rather than serving
   nothing.
+- **A selection that uses only one of the two selector forms** against a document that supports only
+  the other (a document with no `operationId` values at all, or one whose paths cannot be written
+  unambiguously as `METHOD /path`): the tool reports what is available and refuses the unusable
+  entries by name rather than silently resolving nothing.
+- **A selection that mixes both forms**: both resolve; the startup report states which form resolved
+  each live operation.
 - **Two live operations share a path** but differ by method: both are live and routed
   independently.
 - **A path parameter that is not a simple identity** (nested sub-resources, composite keys): the
@@ -171,8 +177,11 @@ human can act on.
 
 - **FR-001**: The tool MUST load an OpenAPI 3.0 or 3.1 document from a local file or a URL and
   MUST resolve internal and external `$ref`s before using it.
-- **FR-002**: The tool MUST accept a selection of operations — by `operationId`, or by
-  `METHOD /path` when no `operationId` exists — and MUST make exactly those operations live.
+- **FR-002**: The tool MUST accept a selection of operations and MUST make exactly those operations
+  live. Two selector forms are mandatory and equally supported — **`METHOD /path`** (e.g.
+  `POST /inventory`), and **`operationId`** — and neither is a fallback for the other: a document may
+  use either as its only workable form, and the tool MUST NOT require one to be absent for the other
+  to be usable.
 - **FR-003**: Every operation that is *not* selected MUST answer in a way that identifies it as
   "not implemented in this mock", and that answer MUST be distinguishable from a record-not-found
   answer.
@@ -241,6 +250,9 @@ human can act on.
 - **FR-023**: On startup the tool MUST print a report listing the operations made live, the
   operations not selected, the entities derived from the live operations, the relationships it
   inferred, and every ambiguity or undetermined relationship it could not resolve confidently.
+  When a selection mixes selector forms (`METHOD /path` and `operationId`), or a form is used that
+  the document cannot support, the report MUST state which form resolved each live operation and
+  must name any entry that could not be resolved.
 - **FR-024**: The startup report and any refusal to start MUST be readable by a human without
   reading source code, and MUST also be emitted as structured logs.
 
@@ -334,7 +346,7 @@ auditable record of what slice 1 carried, narrowed, or deferred.
 | `docs/01` | Slice 1 status | This spec |
 |---|---|---|
 | FR-001 Load 3.0/3.1, resolve `$ref`s | carried | FR-001 |
-| FR-002 Enable by `operationId` or `METHOD /path`; others 501 | carried | FR-002, FR-003 |
+| FR-002 Enable by `operationId` or `METHOD /path`; others 501 | carried (selector parity clarified by A2) | FR-002, FR-003 |
 | FR-003 Validate requests and responses | carried | FR-008, FR-009 |
 | FR-004 Generic CRUD with spec-defined status codes | carried | FR-005, FR-006 |
 | FR-005 Persist in SQLite behind an interface | carried | FR-010 (+ `Store` seam, `plan.md`) |
@@ -381,6 +393,8 @@ constitution principle VI.
   constant (`NOT_IMPLEMENTED`, 501 per RFC 9110 §15.6.2) and one body schema, replacing the prose-only
   assertion in T021/T026. It changes **no requirement** in this document; see the amendment section
   at the tail of `tasks.md` for the pinned decisions and their justification.
+- `docs/05-target-apis.md` — the target vendor APIs, measured from live documents. **Amendment
+  2026-10-04 (A2)**, below, was drafted against its measurements.
 
 ## Amendment Log
 
@@ -390,3 +404,30 @@ amendment that changes no requirement is recorded in `tasks.md` instead and mere
 | Date | Ref | Class | Effect on this spec |
 |---|---|---|---|
 | 2026-10-04 | A1 | PATCH | none — pins the not-implemented response (constant + body) in `tasks.md` T021/T026; FR-003 and SC-004 are unchanged and remain the contract |
+| 2026-10-04 | A2 | MINOR | **FR-002** restated so `METHOD /path` and `operationId` are equally-supported selectors, neither a fallback; **FR-023** extended to state which form resolved each live operation when a selection mixes forms; two edge cases added. Changes no acceptance criterion and no success criterion |
+
+### 2026-10-04 — A2: selector forms are peers, not a fallback chain
+
+**Approved by:** the project owner (human). **Why:** drafted against a measurement, not a guess. The target
+StubHub POS document declares **0 `operationId` values across all 224 operations**
+(`docs/05-target-apis.md` §1), so the phrase "or `METHOD /path` when no `operationId` exists" made the
+only usable selector on the primary target read as the exception. Nothing in the requirement's
+*intent* changed — both forms were always required — but as written it implied a precedence that does
+not exist, and an implementer reading it could reasonably have built `operationId`-first resolution
+with a path fallback, which behaves correctly on the five-operation fixture and is the wrong shape on
+the real document.
+
+**What changed:** the two selector forms are now stated as peers (§FR-002); the startup report must
+say which form resolved each live operation whenever a selection mixes them, or name the entries it
+could not resolve (FR-023); and two edge cases cover a document that supports only one form, and a
+mixed selection.
+
+**What deliberately did NOT change:** FR-004's refusal on an empty or unknown selection, and SC-004's
+requirement that a non-selected operation answer distinctly. Neither is affected by which form
+selected an operation.
+
+**Not in this amendment:** a **tag** selector. Tags are the ergonomic answer on the real document
+(28 tags, all 224 operations tagged, `Invoices` alone covering 32 operations) but a tag name may
+contain a space and the configuration grammar cannot yet express one. That belongs with the
+already-open contract item (the `operations` item pattern), where the grammar is decided once —
+see `tasks.md` T048.
