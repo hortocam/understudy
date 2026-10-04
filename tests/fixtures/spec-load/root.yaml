@@ -1,0 +1,39 @@
+openapi: 3.0.3
+info:
+  title: Spec Load API
+  version: 1.0.0
+paths:
+  /widgets:
+    get:
+      operationId: listWidgets
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "./shared.yaml#/components/schemas/WidgetList"
+    post:
+      operationId: createWidget
+      responses:
+        "201":
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: "./shared.yaml#/components/schemas/Widget"
+  /widgets/{id}:
+    get:
+      operationId: getWidget
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "./shared.yaml#/components/schemas/Widget"

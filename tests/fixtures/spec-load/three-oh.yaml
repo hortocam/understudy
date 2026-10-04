@@ -1,0 +1,22 @@
+openapi: 3.0.3
+info:
+  title: Twin API
+  version: 1.0.0
+paths:
+  /things:
+    get:
+      operationId: listThings
+      responses:
+        "200":
+          description: ok
+  /things/{id}:
+    get:
+      operationId: getThing
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: ok

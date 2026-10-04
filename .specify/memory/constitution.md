@@ -1,15 +1,3 @@
-<!--
-SYNC IMPACT REPORT — temporary review material, removed before commit.
-Initial ratification (no prior version).
-- Version change: none → 1.0.0
-- Principles: 10 established (I–X). Mapping to the handoff's constitution suggestions
-  (docs/04 §Constitution suggestions): I←2, II←1, III←3, IV←4, V←7, VI←6, VII←8,
-  VIII←5, IX←9, X←10.
-- Added sections: Additional Constraints; Development Workflow & Quality Gates; Governance.
-- Removed sections: none.
-- Deferred TODOs: none (ratification date known: 2026-10-03).
--->
-
 # Understudy Constitution
 
 ## Core Principles
@@ -132,8 +120,8 @@ refactor of shipped behaviour, which is exactly the cost this sequencing avoids.
 ## Development Workflow & Quality Gates
 
 - **Spec-first.** No implementation code for a feature until that feature's `spec.md`, `plan.md`
-  and `tasks.md` exist. The **spec** and **plan** are human checkpoints: Cameron approves each
-  before the next phase runs.
+  and `tasks.md` exist. The **spec** and **plan** are human checkpoints: the project owner approves
+  each before the next phase runs.
 - **GitHub Flow.** One feature per branch (`NNN-feature-name` from Spec Kit numbering, or
   `wt/<description>` for agent tasks). `main` is protected: PR required, **1 approving review**,
   the `test` status check required and strict, `enforce_admins` on, force pushes and deletions
@@ -142,8 +130,7 @@ refactor of shipped behaviour, which is exactly the cost this sequencing avoids.
 - **Independent review.** The reviewer MUST come from a **different model lineage** than the
   author. The reviewer runs a Spec Kit converge cycle against the delivered branch and opens the
   pull request only when converge comes back clean.
-- **Single merge authority.** **Jarvis (the coordinator) is the only actor that merges to
-  `main`.** Authors and reviewers never merge, and no one approves their own work.
+- **Single merge authority.** **The coordinator is the only actor that merges to `main`.** Authors and reviewers never merge, and no one approves their own work.
 - **CI is law.** A red `test` check blocks merge. A local pass is not evidence; the check on the
   pull request is.
 - **Evidence over summary.** A phase is "done" only when verified against the remote: a branch
@@ -159,7 +146,7 @@ Where a conflict exists, this document wins and the other artefact is corrected.
   present in every version, and every amendment records its **Why** so the reasoning travels with
   the rule.
 - **Adoption.** There is no ratification hurdle in a one-human, many-agent shop: an amendment is
-  adopted when Cameron approves it.
+  adopted when the project owner approves it.
 - **Versioning.** MAJOR: a principle is removed or redefined. MINOR: a principle or section is
   added, or guidance is materially expanded. PATCH: clarifications, wording, typos.
 - **Compliance.** Every pull request verifies compliance with these principles; the plan's
