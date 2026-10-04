@@ -111,8 +111,10 @@ create a record, restart the process, read it back; call a non-selected operatio
       `origin='runtime'` — the CHECK constraint alone permits all four values, so the invariant
       needs a test, not a comment.
 - [ ] T021 [P] [US1] Integration test in `tests/integration/not-implemented.test.ts`: a
-      non-selected operation returns 501 with the operation named, and 501 ≠ the not-found status
-      (SC-004). Fails first.
+      non-selected operation answers with `NOT_IMPLEMENTED` — the single exported constant, value
+      **501** (RFC 9110 §15.6.2) — and the status is never the document's declared not-found status
+      (SC-004, FR-003). The body matches the tool's own `NotImplementedBody` schema and names the
+      unimplemented operation. Fails first. Assert against the constant, never a bare `501` literal.
 - [ ] T022 [US1] Implement `src/mock/validate.ts`: compile an Ajv validator per operation from the
       dereferenced document (draft 2020-12), and validate request bodies, parameters and headers.
 - [ ] T023 [US1] Implement `src/mock/errors.ts`: render the document's *declared* error responses
@@ -125,8 +127,13 @@ create a record, restart the process, read it back; call a non-selected operatio
       query parameters, in the declared paging style; where none is declared, return the full
       collection (FR-007). Prove paging does not load the collection into memory.
 - [ ] T026 [US1] Implement `src/mock/route.ts` and `src/index.ts`: build the Fastify instance from
-      the derived model, match a request against the live set, dispatch to T024/T025, answer 501
-      for a known-but-unselected operation, and 404 for an unknown path.
+      the derived model, match a request against the live set, dispatch to T024/T025, answer the
+      exported `NOT_IMPLEMENTED` constant (501) for a known-but-unselected operation with the
+      `NotImplementedBody` shape, and the normal HTTP not-found response for a path the document does
+      not declare at all (no such operation exists to declare one). Never hard-code the 501 literal
+      in this file; reference the exported constant so there is one home for the value.
+      Added by the 2026-10-04 amendment (A1): the response code and body for the not-implemented
+      answer are pinned to one exported constant and one schema instead of living only in prose.
 - [ ] T027 [US1] Wire the startup report: refuse to start on any T004 error, otherwise log the
       report (FR-023). Re-run T019–T021; they must now pass.
 
@@ -292,3 +299,55 @@ no existing task above is modified.
       Specification → Path Item Object. Fixture `tests/fixtures/path-params-api.yaml` (path-level and
       mixed-level declarations) added to `tests/unit/resources.test.ts` before the code
       (red → green).
+
+---
+
+## Amendment 2026-10-04 — A1: pin the not-implemented response
+
+**Approved by:** Cameron (human). **Recorded by:** Jarvis (coordinator), before Phase 3 was dispatched.
+
+**Why.** The not-implemented answer was written in prose in about eight artefacts (`docs/01` A3 and
+`docs/01` FR-002, `docs/02`, `docs/03`, `spec.md` FR-002/FR-003, `quickstart.md` §5, `data-model.md`
+`_requests.live`, `contracts/config.schema.yaml`), but the value `501` had no single machine-checked
+home: the only test that would catch a drift (T021) did not exist yet, and nothing specified the
+**body**. Nothing in the tool therefore *enforced* what eight documents *asserted*. This amendment
+is narrow — it changes no requirement — but it removes that duplication-of-authority.
+
+**What this amends** (the only two pre-existing tasks touched; the rest of Phase 3 is unchanged):
+
+| Task | Was | Now |
+|---|---|---|
+| T021 | "returns 501 with the operation named" | asserts the exported `NOT_IMPLEMENTED` constant (501) **and** the `NotImplementedBody` shape; never a bare `501` literal |
+| T026 | "answer 501 … and 404 for an unknown path" | answer `NOT_IMPLEMENTED` for a known-but-unselected operation; the normal not-found response for a path the document does not declare at all |
+
+**The pinned decisions** (the whole point of the amendment — an implementer must not have to
+re-derive these):
+
+1. **Status:** `501 Not Implemented` (RFC 9110 §15.6.2), exported as the constant `NOT_IMPLEMENTED`.
+   Note the honest caveat: RFC 9110 scopes 501 to an *unrecognised request method*, whereas here both
+   method and path are recognised and it is the *operation selection* that excludes it. 501 is the
+   conventional choice for this case (it is what test doubles use for disabled routes) and is kept
+   deliberately; alternatives were rejected — 404 collides with record-not-found and fails SC-004,
+   405 needs an `Allow` header and misstates the cause, 503 implies temporary unavailability.
+2. **Body:** a new `NotImplementedBody` schema, shaped `{ error, method, path, operationId?,
+   detail }`, where `detail` names the unimplemented operation. This lives in the tool's OWN contract
+   (`contracts/mock-errors.schema.yaml`), not in the mocked surface: the mocked surface is derived
+   from the user's OpenAPI document and must not gain tool-specific schemas.
+3. **Distinguishability (the actual MUST):** FR-003 and SC-004 require only that the not-implemented
+   answer differ from the document's *declared* not-found answer. That is asserted against the
+   fixture's declared status, **not** against a hard-coded 404 — a document may declare something
+   other than 404, and T018's fixture must declare one explicitly so the assertion is meaningful.
+4. **Single home:** the constant and the schema are the one source of the value. Prose in the other
+   artefacts stays as documentation; it must not be the enforcement point.
+
+**Constitutional basis.** This is a PATCH-class change: no principle is removed or redefined, and no
+new section of guidance is added — it hardens an existing MUST (FR-003/SC-004) and the Small,
+Documented Config Surface principle's spirit (a value the product depends on should have one
+home, documented). Per the constitution's Governance section, amendments extend and never rewrite;
+nothing above this line was replaced, and the two edited tasks keep their identifying numbers and
+their surrounding text.
+
+**Scope fence for the implementer.** This amendment authorises T021/T026 to introduce
+`NOT_IMPLEMENTED` and `NotImplementedBody` **and nothing else**. It does not authorise: adding any
+tool-owned schema to the mocked surface; changing any other FR or SC; or editing
+`contracts/config.schema.yaml` (that remains open task T048, coordinator-routed).
