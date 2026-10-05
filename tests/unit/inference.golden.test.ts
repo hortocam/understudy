@@ -32,7 +32,8 @@ const CASES: Array<[string, string]> = [
 
 describe("inference goldens", () => {
   it.each(CASES)("%s: collections, links (with status/candidates), identity spaces and paging match the golden", async (name, fixture) => {
-    const { plan: _plan, ...expected } = golden(name);
+    const expected = { ...golden(name) };
+    delete expected.plan; // the plan half is asserted in plan.test.ts
     expect(serialiseModel(await derive(fixture))).toEqual(expected);
   });
 });

@@ -220,7 +220,7 @@ describe("startup report — slice 2 population facts (FR-007, SC-005)", () => {
 
   it("lists undetermined links SEPARATELY, with their candidates, and does not render them as decided", async () => {
     const { text, report } = await slice2Report("collisions-api.yaml");
-    const decided = text.split("\n").filter((l) => /^  \w+ -> \w+ via /.test(l));
+    const decided = text.split("\n").filter((l) => /^ {2}\w+ -> \w+ via /.test(l));
     expect(decided.some((l) => l.includes("Event -> Venue via venueId"))).toBe(true);
     expect(decided.some((l) => l.includes("Order -> Event via eventId"))).toBe(false);
     const section = text.slice(text.indexOf("undetermined links"));
