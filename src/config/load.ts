@@ -52,6 +52,31 @@ export interface ClockConfig {
   start?: string;
 }
 
+/** The four layer folders, resolved to absolute paths against the config file's directory (FR-001). */
+export interface PathsConfig {
+  static: string;
+  imports: string;
+  dynamic: string;
+  behavior: string;
+}
+
+export interface InferenceConfig {
+  idSuffixes: string[];
+  ambiguousNames: string[];
+}
+
+export interface RelationConfig {
+  to: string;
+  onDelete: "restrict" | "cascade" | "setNull";
+}
+
+export interface EntityConfig {
+  idField?: string;
+  writes?: "api" | "actions-only";
+  ids?: { generatedStart?: number; reserved?: string };
+  relations?: Record<string, RelationConfig>;
+}
+
 export interface UnderstudyConfig {
   /** Absolute path or URL of the OpenAPI document. */
   spec: string;
@@ -62,12 +87,26 @@ export interface UnderstudyConfig {
   ids: IdsConfig;
   signing?: SigningConfig;
   clock?: ClockConfig;
+  /** The directory the config file lives in; layer paths and plugin files resolve against it. */
+  baseDir: string;
+  paths: PathsConfig;
+  /** The recipe to apply (a file under `paths.dynamic`, without extension); absent means fixtures only. */
+  recipe?: string;
+  /** The global seed; 0 when absent (D9 — no hidden entropy). */
+  seed: number;
+  entities: Record<string, EntityConfig>;
+  inference: InferenceConfig;
 }
 
 const DEFAULT_SERVER: ServerConfig = { port: 8080, host: "127.0.0.1", basePath: "" };
 const DEFAULT_CONTROL: ControlConfig = { prefix: "/__understudy" };
 const DEFAULT_STORAGE: StorageConfig = { driver: "sqlite", path: "./.understudy/state.db" };
 const DEFAULT_IDS: IdsConfig = { generatedStart: 100000 };
+const DEFAULT_PATHS = { static: "./static", imports: "./imports", dynamic: "./dynamic", behavior: "./behavior" };
+const DEFAULT_INFERENCE: InferenceConfig = {
+  idSuffixes: ["Id", "_id"],
+  ambiguousNames: ["externalId", "referenceId", "refId", "parentId"],
+};
 
 const URL_LIKE = /^[a-z][a-z0-9+.-]*:\/\//i;
 
@@ -101,8 +140,14 @@ function applyDefaults(raw: Record<string, unknown>): Record<string, unknown> {
   const control = isPlainObject(raw.control) ? raw.control : {};
   const storage = isPlainObject(raw.storage) ? raw.storage : {};
   const ids = isPlainObject(raw.ids) ? raw.ids : {};
+  const paths = isPlainObject(raw.paths) ? raw.paths : {};
+  const inference = isPlainObject(raw.inference) ? raw.inference : {};
   return {
     ...raw,
+    paths: { ...DEFAULT_PATHS, ...paths },
+    inference: { ...DEFAULT_INFERENCE, ...inference },
+    seed: typeof raw.seed === "number" ? raw.seed : 0,
+    entities: isPlainObject(raw.entities) ? raw.entities : {},
     server: { ...DEFAULT_SERVER, ...server },
     control: { ...DEFAULT_CONTROL, ...control },
     storage: { ...DEFAULT_STORAGE, ...storage },
@@ -137,6 +182,23 @@ function resolveSpec(spec: string, configDir: string): string {
   return resolve(configDir, spec);
 }
 
+/** Fill the documented `onDelete: restrict` default on every pinned relation. */
+function normaliseEntities(entities: Record<string, EntityConfig>): Record<string, EntityConfig> {
+  const out: Record<string, EntityConfig> = {};
+  for (const [name, entity] of Object.entries(entities)) {
+    const relations = entity.relations
+      ? Object.fromEntries(
+          Object.entries(entity.relations).map(([field, relation]) => [
+            field,
+            { to: relation.to, onDelete: relation.onDelete ?? "restrict" },
+          ]),
+        )
+      : undefined;
+    out[name] = { ...entity, ...(relations ? { relations } : {}) };
+  }
+  return out;
+}
+
 /** Parse config text that came from `source` (a path, used only for messages and resolution). */
 export function parseConfig(text: string, source: string): UnderstudyConfig {
   let raw: unknown;
@@ -162,9 +224,19 @@ export function parseConfig(text: string, source: string): UnderstudyConfig {
   const config = merged as unknown as UnderstudyConfig;
   checkReserved(raw, config);
 
+  const baseDir = dirname(resolve(source));
+  const rawPaths = config.paths as unknown as PathsConfig;
   return {
     ...config,
-    spec: resolveSpec(config.spec, dirname(resolve(source))),
+    spec: resolveSpec(config.spec, baseDir),
+    baseDir,
+    paths: {
+      static: resolve(baseDir, rawPaths.static),
+      imports: resolve(baseDir, rawPaths.imports),
+      dynamic: resolve(baseDir, rawPaths.dynamic),
+      behavior: resolve(baseDir, rawPaths.behavior),
+    },
+    entities: normaliseEntities(config.entities),
   };
 }
 

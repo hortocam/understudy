@@ -64,6 +64,13 @@ function parsePort(value: string): number {
   return Number(value);
 }
 
+function parseSeed(value: string): number {
+  if (!/^-?\d+$/.test(value)) {
+    throw new CommanderError(1, "ustdy.badSeed", `error: "${value}" is not a valid seed (an integer)`);
+  }
+  return Number(value);
+}
+
 function collect(value: string, previous: string[]): string[] {
   return [...previous, value];
 }
@@ -163,6 +170,8 @@ export function buildProgram(io: CliIo): Command {
       collect,
       [] as string[],
     )
+    .option("--recipe <name>", "generation recipe to apply (a file under paths.dynamic; overrides the config's recipe)")
+    .option("--seed <n>", "global seed (overrides the config's and the recipe's seed; default 0)", parseSeed)
     .action(
       async (options: {
         config?: string;
@@ -170,6 +179,8 @@ export function buildProgram(io: CliIo): Command {
         controlPort?: number;
         controlUrl?: string;
         operation: string[];
+        recipe?: string;
+        seed?: number;
       }) => {
         const configPath = options.config ?? io.env.USTDY_CONFIG ?? DEFAULT_CONFIG;
         let config: UnderstudyConfig;
@@ -182,6 +193,9 @@ export function buildProgram(io: CliIo): Command {
         // FR-020: fold the start-time selection into the config createMock sees, so an
         // explicit choice overrides the file's `operations` without any engine-side change.
         config = { ...config, operations: resolveSelection(options, io.env, config) };
+        // Slice 2: the start-time recipe and seed override the file's, the same way.
+        if (options.recipe !== undefined) config = { ...config, recipe: options.recipe };
+        if (options.seed !== undefined) config = { ...config, seed: options.seed };
 
         let mock;
         try {

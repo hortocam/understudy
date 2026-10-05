@@ -131,16 +131,16 @@ contracts; the boundary guard exists and is proven able to fail.
 
 **⚠️ CRITICAL**: no later phase begins until this phase is complete.
 
-- [ ] T007 [P] [FND] Extend the error taxonomy tests in `tests/unit/errors.test.ts` (each message
+- [X] T007 [P] [FND] Extend the error taxonomy tests in `tests/unit/errors.test.ts` (each message
       contains the offending value, and **names the file and key**): `ConfigLayerInvalidError`
       (layer, file, key), `ConfigReferenceError` (unknown collection/field), `ConfigContradictsSpecError`,
       `IdentityRangeOverlapError` (collection), `InvariantViolatedError` (collection, rule,
       budget), `UnknownGeneratorError`, `RecipeNotFoundError`, `GenerationMarkerMismatchError` (D7),
       `FixtureConformanceError`. A relationship cycle is deliberately **not** an error class
       (FR-008: reported, never refused). Fails first.
-- [ ] T008 [FND] Implement the T007 errors in `src/errors.ts` and extend `renderRefusal` so each
+- [X] T008 [FND] Implement the T007 errors in `src/errors.ts` and extend `renderRefusal` so each
       renders `file: key — cause` (the same message shape for every layer, FR-005, Scenario 7).
-- [ ] T009 [P] [FND] **Extend the contract** `specs/002-data-layer/contracts/config.schema.yaml`
+- [X] T009 [P] [FND] **Extend the contract** `specs/002-data-layer/contracts/config.schema.yaml`
       with `$defs` for the four layer files, each with a documented example (constitution IX),
       *extending* the file, never forking it: `LookupFile` and `EntitiesFile` (docs/03 formats),
       `Recipe` (`seed`, `count`, `perParent {entity, range[2], distribution: uniform|zipf}`,
@@ -155,33 +155,33 @@ contracts; the boundary guard exists and is proven able to fail.
       weights-key default for `lookup` (the row's `code`, else its identity), and that **secrets
       never appear** (`${VAR:-default}` strings are validated as text, not expanded).
       Test first (T010).
-- [ ] T010 [P] [FND] Contract tests in `tests/unit/config-layers.test.ts`: **every docs/03
+- [X] T010 [P] [FND] Contract tests in `tests/unit/config-layers.test.ts`: **every docs/03
       worked example validates** (venues, inventory-statuses, ci-small recipe, webhooks,
       actions, simulations, events mapping), and each of: an unknown key, a wrong type, a
       `FieldRule` with two rule kinds, a non-enum `distribution`, a `range` of the wrong arity is
       **refused naming the key**. Fails first against the un-extended contract. Written
       *before* T009 lands (red), checked after.
-- [ ] T011 [FND] Regenerate `src/config/schema.generated.ts` from T009 and add compiled
+- [X] T011 [FND] Regenerate `src/config/schema.generated.ts` from T009 and add compiled
       per-`$def` Ajv validators in `src/config/schema.ts` (one compile each, cached) so every
       layer module validates against the **same** contract.
-- [ ] T012 [P] [US1] Test for the **fixtures layer** in `tests/unit/layers-fixtures.test.ts`:
+- [X] T012 [P] [US1] Test for the **fixtures layer** in `tests/unit/layers-fixtures.test.ts`:
       lookups and entity files parse; a missing `static/` folder (and missing `lookups/` or
       `entities/` alone) is **not an error**; a malformed row refuses naming file and key; two
       files declaring the same `(entity, id)` refuse naming both; a row without the entity's
       identity field refuses; YAML and JSON are both accepted. Fails first.
-- [ ] T013 [US1] Implement `src/config/layers/fixtures.ts`: load, validate, normalise to
+- [X] T013 [US1] Implement `src/config/layers/fixtures.ts`: load, validate, normalise to
       `FixtureSet { lookups, entities }` in a **stable order** (files by name, rows by file
       order). Pure — no store, no document.
-- [ ] T014 [P] [US2] Test for the **recipes layer** in `tests/unit/layers-recipes.test.ts`:
+- [X] T014 [P] [US2] Test for the **recipes layer** in `tests/unit/layers-recipes.test.ts`:
       `dynamic/<name>.yaml` ↔ recipe `<name>`; selecting by `recipe:` and by `--recipe`
       (CLI wins); an unknown recipe refuses naming it and listing the available names; two files
       with the same stem and different extensions refuse; a recipe's `seed` overrides the global
       seed; **JSONata expressions parse at load** (a syntax error refuses naming the
       field); `expr` dependency edges are extracted and a cycle among `expr` fields refuses
       naming both fields. Fails first.
-- [ ] T015 [US2] Implement `src/config/layers/recipes.ts` (load, select, validate, expression
+- [X] T015 [US2] Implement `src/config/layers/recipes.ts` (load, select, validate, expression
       parse + dependency extraction via the JSONata AST). Pure.
-- [ ] T016 [P] [US1] Test for the **tag selector** (D1, FR-002) in
+- [X] T016 [P] [US1] Test for the **tag selector** (D1, FR-002) in
       `tests/unit/operations-tags.test.ts` against a new fixture
       `tests/fixtures/tags-api.yaml` (**no `operationId` anywhere**, a tag `Market Orders`, a
       tag `Invoices`): a tag selects every operation carrying it; `Market_Orders` and the raw
@@ -191,20 +191,20 @@ contracts; the boundary guard exists and is proven able to fail.
       entry matching more than one form refuses as ambiguous naming the forms; an unknown entry
       is still refused by name; the report's `selection.resolved[].form` gains `tag`. Fails
       first. (Anchored to the measured fact: 0/224 operationIds on the target.)
-- [ ] T017 [US1] Implement the tag form in `src/spec/operations.ts` / `src/spec/types.ts`
+- [X] T017 [US1] Implement the tag form in `src/spec/operations.ts` / `src/spec/types.ts`
       (`SelectorForm` += `"tag"`), and update the startup-report rendering for the third form.
       Slice 1's tests stay green untouched.
-- [ ] T018 [P] [FND] Test for the **behaviour layer** in `tests/unit/layers-behavior.test.ts`
+- [X] T018 [P] [FND] Test for the **behaviour layer** in `tests/unit/layers-behavior.test.ts`
       (spec boundary: parsed and validated, **not acted on**): docs/03's four behaviour files
       validate; an unknown key in `behavior/webhooks.yaml` refuses with the **same message shape**
       as a bad `understudy.yaml` key (Scenario 7); a `when`/`template`/`where` JSONata string
       that does not parse refuses; **`${USTDY_WEBHOOK_POS_URL:-…}` is left as text** — assert no
       environment read and no socket opened (reuse `tests/helpers/outbound.ts`). Fails first.
-- [ ] T019 [FND] Implement `src/config/layers/behavior.ts` (load + validate + JSONata syntax
+- [X] T019 [FND] Implement `src/config/layers/behavior.ts` (load + validate + JSONata syntax
       check; returns an inert `BehaviorSet` that nothing in slice 2 consumes) and the
       **imports** shape validator `src/config/layers/imports.ts` (`imports/*.mapping.yaml`
       shape only; nothing reads the data files).
-- [ ] T020 [P] [FND] Test for **reconciliation against the document** (FR-005, constitution I)
+- [X] T020 [P] [FND] Test for **reconciliation against the document** (FR-005, constitution I)
       in `tests/unit/reconcile.test.ts`: `entities.<X>` naming no derived collection, a
       `relations` field that is not a property of the collection, a `relations.to` naming a
       missing collection/field, an `idField` that is not a property, a `ref:`/`lookup:` naming a
@@ -213,7 +213,7 @@ contracts; the boundary guard exists and is proven able to fail.
       the document's schema** (type, enum, format, range — FR-014), a fixture `entity` that is
       neither collection nor lookup (D10), and `ids.generatedStart` at or below an existing fixture
       identity — each refuses **naming file and key**. Fails first.
-- [ ] T021 [FND] Implement `src/config/reconcile.ts`: validate the loaded layers against the
+- [X] T021 [FND] Implement `src/config/reconcile.ts`: validate the loaded layers against the
       derived model and document, collecting **every** refusal before failing (one run, all
       causes, FR-005), and wire it plus the layer loaders into `createMock` before the store is
       opened (`src/index.ts`) and `--recipe`/`--seed` into `src/cli/program.ts` as options of
@@ -775,3 +775,14 @@ nowhere.
 - **T002 — `process.env`.** The one `process.env` read is `src/cli/index.ts`, the CLI's process
   boundary, which hands the environment to the (env-free) program; the guard asserts the *library*
   never reads it.
+- **T007/T008 — red evidence.** The taxonomy classes are declarations; their test failed on the
+  missing exports (not on an assertion) before the classes landed. The behavioural refusals they
+  carry are asserted by T012–T021, each shown failing on a real assertion first.
+- **T009 — contract additions beyond the task text.** The extended contract also adds the
+  `inference` key (`idSuffixes`, `ambiguousNames`), because FR-006 rung 3 says "(configurable
+  rules)" and constitution IX requires every key to ship documented with an example. Defaults are in
+  the contract and applied in `src/config/load.ts`.
+- **T020/T021 — reconcile semantics decided here.** All recipes are reconciled (not only the
+  selected one) so a typo cannot hide in the dataset switched to next; a `relations.to` must
+  target the collection's identity field (a link resolves to a record's identity); `lookup:` names a
+  fixture table; `choice` values are checked against the property's own schema.

@@ -1,11 +1,12 @@
 /**
  * Operation collection and selection (FR-002, FR-004).
  *
- * Selection entries are either `operationId` or `METHOD /path`. A selection is
- * resolved as a whole: if any entry names an operation the document does not
+ * Selection entries are an `operationId`, a `METHOD /path`, or a tag — three peers with no
+ * precedence (FR-002; slice 2 adds the tag form because the measured target declares no
+ * `operationId` at all). A selection is resolved as a whole: if any entry names an operation the document does not
  * contain, the whole selection is refused by name.
  */
-import { EmptySelectionError, UnknownOperationError } from "../errors.js";
+import { AmbiguousSelectionError, EmptySelectionError, UnknownOperationError } from "../errors.js";
 import type { DocumentOperation, ResolvedSelectionEntry, SelectionResult, SelectorForm } from "./types.js";
 
 export type { DocumentOperation, ResolvedSelectionEntry, SelectionResult, SelectorForm } from "./types.js";
@@ -42,20 +43,60 @@ export function operationKey(operation: DocumentOperation): string {
   return `${operation.method} ${operation.path}`;
 }
 
+/** A tag written with `_` for each space (`Market Orders` -> `Market_Orders`), the config spelling. */
+function normaliseTag(tag: string): string {
+  return tag.trim().replace(/\s+/g, "_");
+}
+
+function tagsOf(operation: DocumentOperation): string[] {
+  const tags = operation.operation.tags;
+  return Array.isArray(tags) ? tags.filter((tag): tag is string => typeof tag === "string") : [];
+}
+
+/** Every distinct tag the operations carry (the document's top-level `tags` array is optional). */
+function distinctTags(operations: DocumentOperation[]): string[] {
+  return [...new Set(operations.flatMap(tagsOf))];
+}
+
 /**
- * The form an entry is written in, decided by its spelling alone — neither form is a
- * fallback for the other, so an entry never "tries" the other form (FR-002, A2).
+ * The form an entry is written in, when its spelling alone decides it: `METHOD /path` is
+ * unmistakable; anything else is an `operationId` or a tag and is decided by what the document
+ * contains (`resolveEntry`) — never by trying one as a fallback for the other.
  */
 export function selectorForm(entry: string): SelectorForm {
   return METHOD_PATH.test(entry.trim()) ? "method-path" : "operationId";
 }
 
-function findMatches(operations: DocumentOperation[], entry: string, form: SelectorForm): DocumentOperation[] {
-  if (form === "method-path") {
-    const [method, path] = entry.trim().split(/\s+/) as [string, string];
-    return operations.filter((op) => op.method === method.toUpperCase() && op.path === path);
+interface Resolution {
+  form: SelectorForm;
+  matches: DocumentOperation[];
+}
+
+/**
+ * Resolve one entry against the document. The three forms are peers: the entry is looked up in
+ * each, and if it names something in more than one form (an operationId spelled like a tag), or
+ * collapses two distinct tags into one spelling, the entry is refused by name rather than
+ * resolved by a hidden priority.
+ */
+function resolveEntry(operations: DocumentOperation[], entry: string): Resolution | undefined {
+  const trimmed = entry.trim();
+  if (METHOD_PATH.test(trimmed)) {
+    const [method, path] = trimmed.split(/\s+/) as [string, string];
+    const matches = operations.filter((op) => op.method === method.toUpperCase() && op.path === path);
+    return matches.length > 0 ? { form: "method-path", matches } : undefined;
   }
-  return operations.filter((op) => op.operationId !== undefined && op.operationId === entry.trim());
+  const byId = operations.filter((op) => op.operationId !== undefined && op.operationId === trimmed);
+  const matchingTags = distinctTags(operations).filter((tag) => tag === trimmed || normaliseTag(tag) === trimmed);
+  if (matchingTags.length > 1) {
+    throw new AmbiguousSelectionError(entry, matchingTags.map((tag) => `tag "${tag}"`));
+  }
+  const byTag = matchingTags[0] === undefined ? [] : operations.filter((op) => tagsOf(op).includes(matchingTags[0] as string));
+  if (byId.length > 0 && byTag.length > 0) {
+    throw new AmbiguousSelectionError(entry, [`the operationId of ${operationKey(byId[0] as DocumentOperation)}`, `the tag "${matchingTags[0]}"`]);
+  }
+  if (byId.length > 0) return { form: "operationId", matches: byId };
+  if (byTag.length > 0) return { form: "tag", matches: byTag };
+  return undefined;
 }
 
 /**
@@ -76,9 +117,9 @@ export function selectOperations(
   const resolved: ResolvedSelectionEntry[] = [];
 
   for (const entry of selection) {
-    const form = selectorForm(entry);
-    const matches = findMatches(all, entry, form);
-    if (matches.length === 0) throw new UnknownOperationError(entry);
+    const resolution = resolveEntry(all, entry);
+    if (!resolution) throw new UnknownOperationError(entry);
+    const { form, matches } = resolution;
     for (const match of matches) {
       const key = operationKey(match);
       if (!liveKeys.has(key)) {

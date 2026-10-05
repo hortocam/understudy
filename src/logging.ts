@@ -66,7 +66,7 @@ export function renderStartupReport(report: StartupReport): string {
   // common single-form report is not noise.
   if (report.selection.mixed) {
     lines.push("");
-    lines.push(`selection resolved by two forms (${report.selection.forms.join(" + ")}):`);
+    lines.push(`selection resolved by several forms (${report.selection.forms.join(" + ")}):`);
     for (const entry of report.selection.resolved) {
       lines.push(`  ${entry.form}: "${entry.entry}" -> ${entry.methodPath}`);
     }

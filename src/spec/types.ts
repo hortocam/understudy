@@ -12,8 +12,8 @@ export interface DocumentOperation {
   operation: Record<string, unknown>;
 }
 
-/** The two selector forms are peers (FR-002, amendment A2) — an entry's spelling decides. */
-export type SelectorForm = "method-path" | "operationId";
+/** The three selector forms are peers (FR-002, amendment A2) — an entry's spelling decides. */
+export type SelectorForm = "method-path" | "operationId" | "tag";
 
 /** How one configured selection entry resolved against the document (FR-023, A2). */
 export interface ResolvedSelectionEntry {

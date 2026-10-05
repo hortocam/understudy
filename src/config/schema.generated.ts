@@ -105,11 +105,17 @@ export const configSchema: Record<string, unknown> = {
             "properties": {
               "generatedStart": {
                 "type": "integer",
-                "description": "First generated identity, for an integer identity space. Reserved: it must not overlap fixture identities."
+                "description": "First generated identity, for an integer identity space. Reserved: it must not overlap fixture identities.",
+                "examples": [
+                  500000
+                ]
               },
               "reserved": {
                 "type": "string",
-                "description": "An explicit reserved span for a non-integer identity space (a uuid or vendor-prefixed format). Overlapping configured spans refuse to start, naming the collection (FR-017, SC-006)."
+                "description": "An explicit reserved span for a non-integer identity space, written '<from>..<to>' inclusive: for a prefixed/formatted string the declared pattern's numeric run ('EVT-100000..EVT-199999'); for a uuid a leading-hex span ('a0000000..afffffff'). Overlapping configured spans, or fixture identities inside the span, refuse to start naming the collection (FR-017, SC-006).",
+                "examples": [
+                  "EVT-100000..EVT-199999"
+                ]
               }
             }
           },
@@ -252,6 +258,1174 @@ export const configSchema: Record<string, unknown> = {
           "description": "The instant the real clock reports and the reference date pinned for every time-relative generated value, so a seeded run is reproducible (research §1)."
         }
       }
+    },
+    "inference": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "idSuffixes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "default": [
+            "Id",
+            "_id"
+          ],
+          "description": "Property-name suffixes that propose a link to the collection named by the rest of the name ('eventId' proposes Event). A proposal is decided only when unambiguous (FR-006)."
+        },
+        "ambiguousNames": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "default": [
+            "externalId",
+            "referenceId",
+            "refId",
+            "parentId"
+          ],
+          "description": "Property names that denote a different entity per collection (the measured 'externalId' occurs 45 times, each meaning a different external system). They are never decided by convention: each is reported as an undetermined link and pinned with entities.<X>.relations."
+        }
+      },
+      "description": "The naming-convention rules of link inference (evidence rung 3). Both keys are optional; the defaults are shown.",
+      "examples": [
+        {
+          "idSuffixes": [
+            "Id"
+          ],
+          "ambiguousNames": [
+            "externalId"
+          ]
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "FixtureFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "entity": {
+          "type": "string",
+          "description": "The collection (a derived resource) or lookup-table name the rows belong to. A collection is stored with origin 'static'; a name that is not a collection is an in-memory lookup table (reported as 'lookup-only'). Anything else refuses to start."
+        },
+        "idField": {
+          "type": "string",
+          "description": "The identity property of the rows. Defaults to the collection's derived identity field, else 'id'."
+        },
+        "rows": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object"
+          },
+          "description": "Fixed rows. Each declares its own identity and is applied identically on every run; generation, import and runtime allocation never reuse these identities (FR-002, FR-017)."
+        }
+      },
+      "required": [
+        "entity",
+        "rows"
+      ]
+    },
+    "LookupFile": {
+      "$ref": "#/$defs/FixtureFile",
+      "description": "static/lookups/*.yaml — a small named table of codes (FR-001). A recipe field rule 'lookup: <entity>' draws a row of it.",
+      "examples": [
+        {
+          "entity": "InventoryStatus",
+          "idField": "id",
+          "rows": [
+            {
+              "id": 1,
+              "code": "available"
+            },
+            {
+              "id": 2,
+              "code": "held"
+            }
+          ]
+        }
+      ]
+    },
+    "EntitiesFile": {
+      "$ref": "#/$defs/FixtureFile",
+      "description": "static/entities/*.yaml — fixed records with fixed identities (FR-001).",
+      "examples": [
+        {
+          "entity": "Venue",
+          "rows": [
+            {
+              "id": 1,
+              "name": "Test Arena"
+            }
+          ]
+        }
+      ]
+    },
+    "FieldRule": {
+      "description": "One instruction for one field (FR-011). Exactly one rule kind per field. Precedence level 1 of FR-010 (faker rules are the heuristic, level 5, but an explicit 'faker:' rule is still an explicit rule and wins).",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "generator": {
+              "type": "string",
+              "description": "A named generator: a built-in (choice/sequence-like names) or a custom one declared under the recipe's 'generators' (FR-012). One namespace."
+            }
+          },
+          "required": [
+            "generator"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "faker": {
+              "type": "string",
+              "description": "A path into @faker-js/faker, e.g. 'string.alpha' or 'finance.amount'. Remaining keys are that method's options (length, casing, min, max, dec, ...)."
+            }
+          },
+          "required": [
+            "faker"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "generator"
+                ]
+              },
+              {
+                "required": [
+                  "lookup"
+                ]
+              },
+              {
+                "required": [
+                  "ref"
+                ]
+              },
+              {
+                "required": [
+                  "seq"
+                ]
+              },
+              {
+                "required": [
+                  "choice"
+                ]
+              },
+              {
+                "required": [
+                  "expr"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "lookup": {
+              "type": "string",
+              "description": "A lookup table (fixture entity) name."
+            },
+            "weights": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "number",
+                "minimum": 0
+              },
+              "description": "Weight by row key (the row's 'by' field); omitted means uniform."
+            },
+            "by": {
+              "type": "string",
+              "description": "The row field the weights are keyed by. Default 'code', else the row's identity."
+            },
+            "value": {
+              "type": "string",
+              "description": "The row field the draw yields. Default: the row's identity, so the stored value references a real row."
+            }
+          },
+          "required": [
+            "lookup"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "ref": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*\\.[A-Za-z_][A-Za-z0-9_]*$",
+              "description": "'<Collection>.<field>' — the value of an existing record of another collection (usually its identity)."
+            }
+          },
+          "required": [
+            "ref"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "seq": {
+              "type": "string",
+              "description": "A named sequence, monotonic and independent per collection."
+            },
+            "start": {
+              "type": "integer",
+              "default": 1
+            },
+            "step": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          "required": [
+            "seq"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "choice": {
+              "type": "array",
+              "minItems": 1,
+              "description": "A value drawn from this explicit set."
+            },
+            "weights": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          },
+          "required": [
+            "choice"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "expr": {
+              "type": "string",
+              "description": "A JSONata calculation over the record's own sibling fields, evaluated after the fields it names. Seeded helpers are available: $uniform(min,max), $choice(array), $int(min,max)."
+            }
+          },
+          "required": [
+            "expr"
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "faker": "string.alpha",
+          "length": 1,
+          "casing": "upper"
+        },
+        {
+          "expr": "cost * $uniform(1.1, 2.5)"
+        },
+        {
+          "lookup": "InventoryStatus",
+          "weights": {
+            "available": 0.8,
+            "held": 0.2
+          }
+        },
+        {
+          "ref": "Event.id"
+        },
+        {
+          "choice": [
+            "GA",
+            "FLOOR"
+          ]
+        }
+      ]
+    },
+    "GeneratorDef": {
+      "description": "A custom named generator (FR-012), used in a field rule exactly like a built-in: 'generator: <name>'. Defined inline, or by a plugin file whose default export is (ctx) => value and which receives only the collection's seeded random stream.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "choice": {
+              "type": "array",
+              "minItems": 1
+            },
+            "weights": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          },
+          "required": [
+            "choice"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "faker": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "faker"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "generator"
+                ]
+              },
+              {
+                "required": [
+                  "lookup"
+                ]
+              },
+              {
+                "required": [
+                  "ref"
+                ]
+              },
+              {
+                "required": [
+                  "seq"
+                ]
+              },
+              {
+                "required": [
+                  "choice"
+                ]
+              },
+              {
+                "required": [
+                  "expr"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "seq": {
+              "type": "string"
+            },
+            "start": {
+              "type": "integer",
+              "default": 1
+            },
+            "step": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          "required": [
+            "seq"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "plugin"
+          ],
+          "properties": {
+            "plugin": {
+              "type": "string",
+              "description": "Path of an ES module (relative to the recipe file) whose default export is a function (ctx) => value; ctx.rng is the collection's seeded stream. Plugins are local files: the tool opens no network connection to load one."
+            }
+          }
+        }
+      ],
+      "examples": [
+        {
+          "choice": [
+            "100",
+            "101",
+            "FLOOR",
+            "GA"
+          ]
+        }
+      ]
+    },
+    "RecipeEntity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "const": "import",
+          "description": "Reserved for slice 3: this collection's records come from an import mapping and generation skips it (reported, never silent)."
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "An absolute number of records to generate."
+        },
+        "perParent": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "entity": {
+              "type": "string",
+              "description": "The parent collection."
+            },
+            "range": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "minItems": 2,
+              "maxItems": 2,
+              "description": "[min, max] children per parent, inclusive."
+            },
+            "distribution": {
+              "type": "string",
+              "enum": [
+                "uniform",
+                "zipf"
+              ],
+              "default": "uniform",
+              "description": "The shape of per-parent counts over the range: 'uniform' or 'zipf' (mass concentrated toward the minimum)."
+            }
+          },
+          "required": [
+            "entity",
+            "range"
+          ],
+          "description": "A count relative to a parent collection (FR-015). Every child references a real parent."
+        },
+        "fields": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/FieldRule"
+          },
+          "description": "Field rules; an unlisted field falls through the precedence chain (supplied value, the document's own constraints/examples/defaults, a plausible-value heuristic, the type default)."
+        },
+        "constraints": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Invariants (FR-013): JSONata boolean expressions over the generated record, e.g. 'price >= cost'. A violating draw is redrawn; past the budget the run fails naming the rule."
+        },
+        "redraws": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 50,
+          "description": "The redraw budget per record for 'constraints' (FR-013)."
+        }
+      },
+      "description": "One collection's generation recipe. A collection absent from the recipe is not generated (fixtures only). It must say how many: 'count' or 'perParent' (or 'source: import')."
+    },
+    "Recipe": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "seed": {
+          "type": "integer",
+          "description": "Overrides the global seed for this recipe."
+        },
+        "entities": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/RecipeEntity"
+          }
+        },
+        "generators": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/GeneratorDef"
+          }
+        }
+      },
+      "description": "dynamic/<name>.yaml — a named, switchable generation recipe (FR-003).",
+      "examples": [
+        {
+          "seed": 42,
+          "entities": {
+            "Event": {
+              "source": "import"
+            },
+            "Inventory": {
+              "perParent": {
+                "entity": "Event",
+                "range": [
+                  10,
+                  50
+                ],
+                "distribution": "zipf"
+              },
+              "fields": {
+                "section": {
+                  "generator": "sectionCode"
+                },
+                "row": {
+                  "faker": "string.alpha",
+                  "length": 1,
+                  "casing": "upper"
+                },
+                "quantity": {
+                  "faker": "number.int",
+                  "min": 2,
+                  "max": 8
+                },
+                "cost": {
+                  "faker": "finance.amount",
+                  "min": 20,
+                  "max": 400,
+                  "dec": 2
+                },
+                "price": {
+                  "expr": "cost * $uniform(1.1, 2.5)"
+                },
+                "statusId": {
+                  "lookup": "InventoryStatus",
+                  "weights": {
+                    "available": 0.8,
+                    "held": 0.1,
+                    "sold": 0.1
+                  }
+                }
+              },
+              "constraints": [
+                "price >= cost"
+              ]
+            }
+          },
+          "generators": {
+            "sectionCode": {
+              "choice": [
+                "100",
+                "101",
+                "102",
+                "200",
+                "201",
+                "FLOOR",
+                "GA"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "ImportMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "file": {
+              "type": "string"
+            },
+            "format": {
+              "type": "string",
+              "enum": [
+                "json",
+                "csv",
+                "yaml"
+              ]
+            }
+          },
+          "required": [
+            "file",
+            "format"
+          ]
+        },
+        "select": {
+          "type": "string",
+          "description": "JSONPath, or a 'jsonata:'-prefixed expression."
+        },
+        "targets": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "entity": {
+                "type": "string"
+              },
+              "upsertKey": {
+                "type": "string"
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": {
+                  "oneOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "lookup": {
+                          "type": "string"
+                        },
+                        "by": {
+                          "type": "string"
+                        },
+                        "from": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "lookup",
+                        "from"
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "entity",
+              "fields"
+            ]
+          }
+        }
+      },
+      "required": [
+        "source",
+        "targets"
+      ],
+      "description": "imports/*.mapping.yaml — SHAPE ONLY in slice 2 (validated, never read); import execution is slice 3.",
+      "examples": [
+        {
+          "source": {
+            "file": "./data/events.json",
+            "format": "json"
+          },
+          "select": "$.events[*]",
+          "targets": [
+            {
+              "entity": "Event",
+              "upsertKey": "externalId",
+              "fields": {
+                "externalId": "$.id",
+                "name": "$.title",
+                "startsAt": "$.start_time",
+                "categoryId": {
+                  "lookup": "EventCategory",
+                  "by": "code",
+                  "from": "$.category"
+                }
+              }
+            },
+            {
+              "entity": "Venue",
+              "upsertKey": "externalId",
+              "fields": {
+                "externalId": "$.venue.id",
+                "name": "$.venue.name"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "BehaviorFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "targets": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "url": {
+                "type": "string",
+                "description": "Where deliveries go. '${NAME:-default}' is kept as text and never expanded in this slice; secrets come from the environment, never this file."
+              },
+              "headers": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "retry": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "max": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "backoff": {
+                    "type": "string",
+                    "enum": [
+                      "fixed",
+                      "exponential"
+                    ]
+                  },
+                  "baseMs": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "jitterMs": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              "timeoutMs": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "url"
+            ]
+          }
+        },
+        "subscriptions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "on": {
+                "type": "string",
+                "description": "'Collection.created|updated|deleted' or an operation-bound 'METHOD /path'."
+              },
+              "when": {
+                "type": "string",
+                "description": "A JSONata condition; parsed at load."
+              },
+              "target": {
+                "type": "string"
+              },
+              "delay": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "minMs": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "maxMs": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              "template": {
+                "type": "string",
+                "description": "An inline JSONata template, or a './path.jsonata' file reference."
+              },
+              "faults": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "duplicate": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "drop": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              }
+            },
+            "required": [
+              "name",
+              "on",
+              "target"
+            ]
+          }
+        },
+        "actions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "integer",
+                        "number",
+                        "string",
+                        "boolean"
+                      ]
+                    },
+                    "optional": {
+                      "type": "boolean"
+                    },
+                    "default": {}
+                  },
+                  "required": [
+                    "type"
+                  ]
+                }
+              },
+              "steps": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "select"
+                      ],
+                      "properties": {
+                        "select": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "as": {
+                              "type": "string"
+                            },
+                            "entity": {
+                              "type": "string"
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "where": {
+                              "type": "string"
+                            },
+                            "pick": {
+                              "type": "string",
+                              "enum": [
+                                "random",
+                                "first"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "as",
+                            "entity"
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "fail_if_empty"
+                      ],
+                      "properties": {
+                        "fail_if_empty": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "var": {
+                              "type": "string"
+                            },
+                            "code": {
+                              "type": "integer"
+                            },
+                            "message": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "var"
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "create"
+                      ],
+                      "properties": {
+                        "create": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "as": {
+                              "type": "string"
+                            },
+                            "entity": {
+                              "type": "string"
+                            },
+                            "fields": {
+                              "type": "object"
+                            }
+                          },
+                          "required": [
+                            "entity"
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "update"
+                      ],
+                      "properties": {
+                        "update": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "target": {
+                              "type": "string"
+                            },
+                            "set": {
+                              "type": "object"
+                            }
+                          },
+                          "required": [
+                            "target",
+                            "set"
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "webhook"
+                      ],
+                      "properties": {
+                        "webhook": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "target": {
+                              "type": "string"
+                            },
+                            "template": {
+                              "type": "string"
+                            },
+                            "with": {
+                              "type": "object"
+                            }
+                          },
+                          "required": [
+                            "target"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "steps"
+            ]
+          }
+        },
+        "reactions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "on": {
+                "type": "string"
+              },
+              "run": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "name",
+              "on",
+              "run"
+            ]
+          }
+        },
+        "simulations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "seed": {
+                "type": "integer"
+              },
+              "rules": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "run": {
+                      "type": "string"
+                    },
+                    "every": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "range": {
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              {
+                                "type": "string",
+                                "pattern": "^[0-9]+(ms|s|m|h)$"
+                              }
+                            ],
+                            "description": "Milliseconds, or a string like 20s, 5m."
+                          },
+                          "minItems": 2,
+                          "maxItems": 2
+                        }
+                      },
+                      "required": [
+                        "range"
+                      ]
+                    },
+                    "max": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "on": {
+                      "type": "string"
+                    },
+                    "probability": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "after": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "range": {
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              {
+                                "type": "string",
+                                "pattern": "^[0-9]+(ms|s|m|h)$"
+                              }
+                            ],
+                            "description": "Milliseconds, or a string like 20s, 5m."
+                          },
+                          "minItems": 2,
+                          "maxItems": 2
+                        }
+                      },
+                      "required": [
+                        "range"
+                      ]
+                    },
+                    "params": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            },
+            "required": [
+              "rules"
+            ]
+          }
+        }
+      },
+      "description": "behavior/*.yaml — PARSED AND VALIDATED in slice 2, ACTED ON in slices 4-5: nothing here opens a socket or runs. A file may hold any of targets, subscriptions, actions, reactions, simulations.",
+      "examples": [
+        {
+          "targets": {
+            "pos": {
+              "url": "${USTDY_WEBHOOK_POS_URL:-http://localhost:9000/hooks/pos}",
+              "headers": {
+                "X-Source": "mock"
+              },
+              "retry": {
+                "max": 5,
+                "backoff": "exponential",
+                "baseMs": 500,
+                "jitterMs": 200
+              },
+              "timeoutMs": 5000
+            }
+          },
+          "subscriptions": [
+            {
+              "name": "inventory-sold",
+              "true": "Inventory.updated",
+              "when": "$exists(changed[$='statusId']) and after.statusId = 3",
+              "target": "pos",
+              "delay": {
+                "minMs": 0,
+                "maxMs": 500
+              },
+              "template": "{\n  \"type\": \"inventory.sold\",\n  \"occurredAt\": $now(),\n  \"data\": { \"id\": after.id, \"eventId\": after.eventId, \"quantity\": after.quantity }\n}\n",
+              "faults": {
+                "duplicate": 0,
+                "drop": 0
+              }
+            },
+            {
+              "name": "inventory-created",
+              "true": "POST /inventory",
+              "target": "pos",
+              "template": "./templates/inventory-created.jsonata"
+            }
+          ]
+        }
+      ]
     }
   }
 };

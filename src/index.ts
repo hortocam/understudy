@@ -19,6 +19,13 @@ import { loadSpec } from "./spec/load.js";
 import { selectOperations } from "./spec/operations.js";
 import { buildStartupReport } from "./spec/report.js";
 import { deriveModel } from "./spec/resources.js";
+import { loadBehavior } from "./config/layers/behavior.js";
+import { loadFixtures } from "./config/layers/fixtures.js";
+import { loadImportMappings } from "./config/layers/imports.js";
+import { loadRecipes, selectRecipe } from "./config/layers/recipes.js";
+import { ConfigRefusedError } from "./errors.js";
+import { reconcile } from "./config/reconcile.js";
+import { BUILTIN_GENERATOR_NAMES, isFakerPath } from "./data/generators/names.js";
 import type { StartupReport } from "./spec/types.js";
 
 export type { UnderstudyConfig } from "./config/load.js";
@@ -81,6 +88,26 @@ export async function createMock(
 
     // 3. Derive the model from the live set (FR-023).
     const model = deriveModel(spec.document, selection.live);
+
+    // 3b. Load the four configuration layers (FR-001) and reconcile them against the document
+    // (FR-005): every cause is collected, so one refusal lists the whole problem. Nothing is
+    // written and nothing is bound until this passes. The behaviour and imports layers are
+    // validated and consumed nowhere (slices 3–5).
+    const fixtures = loadFixtures(config.paths.static, config.baseDir);
+    const recipes = loadRecipes(config.paths.dynamic, config.baseDir);
+    const recipe = config.recipe === undefined ? undefined : selectRecipe(recipes, config.recipe);
+    loadBehavior(config.paths.behavior, config.baseDir);
+    loadImportMappings(config.paths.imports, config.baseDir);
+    const refusals = reconcile({
+      config,
+      model,
+      fixtures,
+      recipes: [...recipes.values()],
+      knownGenerators: BUILTIN_GENERATOR_NAMES,
+      isFakerPath,
+    });
+    if (refusals.length > 0) throw new ConfigRefusedError(refusals);
+    void recipe;
 
     // 4. Build the report from all three (FR-023, FR-024).
     const report = buildStartupReport({

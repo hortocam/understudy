@@ -1,0 +1,48 @@
+openapi: 3.0.1
+info:
+  title: Tag collision API
+  version: 1.0.0
+  description: >
+    Shape-faithful to the measured target (docs/05): NO operation declares an operationId, every
+    operation carries one tag, one tag contains a space and ANOTHER is its underscore spelling (an ambiguous collapse), and there is no top-level `tags` array.
+paths:
+  /market-orders:
+    get:
+      tags: [Market Orders]
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/MarketOrder" } } } } } }
+    post:
+      tags: [Market Orders]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/MarketOrder" } } } }
+      responses: { "201": { description: created, content: { application/json: { schema: { $ref: "#/components/schemas/MarketOrder" } } } } }
+  /market-orders/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+    get:
+      tags: [Market Orders]
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/MarketOrder" } } } } }
+  /invoices:
+    get:
+      tags: [Invoices]
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Invoice" } } } } } }
+  /invoices/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+    get:
+      tags: [Invoices]
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Invoice" } } } } }
+  /venues:
+    get:
+      tags: [Market_Orders]
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Venue" } } } } } }
+components:
+  schemas:
+    MarketOrder:
+      title: MarketOrder
+      type: object
+      properties: { id: { type: integer }, symbol: { type: string } }
+    Invoice:
+      title: Invoice
+      type: object
+      properties: { id: { type: integer }, total: { type: number } }
+    Venue:
+      title: Venue
+      type: object
+      properties: { id: { type: integer }, name: { type: string } }
