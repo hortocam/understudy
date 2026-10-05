@@ -10,7 +10,7 @@ test task that defines it. **Red means a failing real assertion** — `Cannot fi
 `is not a function` prove nothing; where a module does not exist yet, the test task lands a
 minimal typed stub that returns the wrong answer so the assertion, not the import, is what fails,
 and that stub is replaced by the implementation task. Test and implementation land in the same
-change (one PR per phase).
+change. **Delivery for this slice is one PR (see "Delivery" below), not one per phase.**
 
 **Organization**: sequential, independently testable **phases**; within a phase, tests first.
 User-story tags (`[US1]`…`[US7]`) name the story from `spec.md` a task serves; `[FND]` marks
@@ -26,23 +26,53 @@ foundational work no single story owns.
 - **Negative control** = the mutation that must make a statistical/structural test fail, run once
   and recorded in the PR (`NC:` lines below say which).
 
-## Decisions this task list takes (raise at the checkpoint)
+## Decisions this task list takes (resolved at the checkpoint)
 
 These are gaps or tensions found while decomposing the approved artefacts. None edits the spec;
-each states the reading the tasks follow, and the owner can overrule at this checkpoint.
+each states the reading the tasks follow. **All ten were reviewed by the owner at the checkpoint and
+are now confirmed or resolved** — the readings below are the decisions of record. D2 is the one that
+changes slice-1 behaviour in a *new* way: it is resolved in favour of API writes being mutations,
+with the FR-002/SC-003 wording corrected in slice 2 (spec-first) rather than deferred.
 
-| # | Finding | Reading these tasks follow |
+| # | Finding | Decision of record |
 |---|---|---|
 | D1 | **A tag selector does not exist in slice 1.** FR-002 says fixtures select "against the same grammar the core slice delivers … `METHOD /path`, `operationId` and a tag", but `src/spec/operations.ts` implements two forms and slice 1's A2 amendment explicitly deferred tags. The config contract (002) already describes tag entries. | Slice 2 **implements** the tag selector (T016/T017) as a third peer form, with the space-normalisation rule in FR-002. Slice 1's *spec* stays untouched; only `src/spec/operations.ts` changes. |
-| D2 | **FR-002 "MUST NEVER be modified by … activity over the mocked API" vs. "the mocked surface's semantics stay slice 1's".** A `PATCH`/`PUT`/`DELETE` addressed to a *static-origin* record would modify a fixture row, and refusing it is new CRUD behaviour the slice boundary forbids. US1.3, quickstart §2 and SC-003 only exercise *creates*. | Slice 2 proves SC-003 under creates, reads, lists and writes to non-static rows, and proves the fixture **files** are never rewritten. A write to a static-origin row is **reported as an open question in the PR, not silently decided**; T043 pins the current behaviour with a test named `OPEN-D2` so a later decision flips one assertion. |
+| D2 | **FR-002 "MUST NEVER be modified by … activity over the mocked API" vs. "the mocked surface's semantics stay slice 1's".** A `PATCH`/`PUT`/`DELETE` addressed to a *static-origin* record would modify a fixture row, and refusing it is new CRUD behaviour the slice boundary forbids. US1.3, quickstart §2 and SC-003 only exercise *creates*. | **Resolved at the checkpoint: writes to a fixture are mutations, and slice 2 owns closing the gap — no deferral.** A `PATCH`/`PUT`/`DELETE` addressed to a static-origin row **does** mutate it (slice 1's semantics stand), which makes FR-002/SC-003's literal "MUST NEVER be modified by activity over the mocked API" false in that path. Rather than carry the discordance to a later slice, slice 2 **narrows SC-003 to what is provable without new CRUD semantics**: the fixture **files** are never rewritten, fixture rows are applied identically on every start, and `static` rows are byte-identical across generation, reads, lists and `wipe`. T043 proves exactly that and drops the `OPEN-D2` placeholder. **Two doc follow-ups land with T043 (spec-first: the spec is corrected to match the code, never the reverse):** (a) `spec.md` FR-002/SC-003 are amended to scope the immutability guarantee to the layers that own the rows, with the API-write path named explicitly; (b) an **A4 amendment** records this decision and its *Why* (constitution Governance) so the reasoning travels, and so a slice-1↔2 discordance is not left as a silent contradiction. |
 | D3 | **Plan vs data-model disagree on where the identity range lives.** `plan.md`/`research.md` §4: "metadata key `id_seq:<resource>`"; `data-model.md` §3: "promoted to a table `_id_ranges`". | Both, with different jobs: `id_seq:<resource>` stays the **runtime** counter (slice 1, unchanged, rewound by wipe); `_id_ranges` records the **reserved span, its space and the allocation cursor** for generation. T022 adds the table; the meta key is not renamed again. |
 | D4 | **The control API has a contract file (slice 1's, frozen) and FR-021 adds an operation.** The plan names `control/routes.ts` EXTENDED but no `contracts/control-api.*`. The served document is drift-tested byte-for-byte against the checked-in file. | Same treatment as the config contract (plan "Known integration point"): a slice-2 **extension** `specs/002-data-layer/contracts/control-api.openapi.json` (slice 1's file kept as history, never edited), and the generator and drift test repointed (T005/T006). Likewise `contracts/cli.md` is extended at `specs/002-data-layer/contracts/cli.md` for `init`, `generate`, `--recipe`, `--seed`. |
 | D5 | **Store seam.** The brief says `Store` is consumed "unchanged"; slice 2 needs transactional bulk insert, FK/indexes at table creation and counts-by-origin. | **Additive only** (principle X): new optional-by-use methods and an options argument to `ensureResource`; no existing method changes signature or meaning (T021–T028). Slice 1's store tests stay green untouched. |
 | D6 | **`quickstart.md` assumes commands that do not exist yet** (`ustdy reset --to baseline`, `ustdy export`). Slice 1 has one reset mode, `wipe`; export is slice 3. | Quickstart's own parenthetical already routes the export comparison to `tests/integration/determinism.test.ts`. The recorded run (T088) uses `reset --to wipe`, and any step that cannot behave as written is called out and fixed in the **quickstart or the code**, and the PR says which. |
-| D7 | **Generation on a non-empty store.** Not specified. | `up --recipe` generates when the store holds **no generated rows**; when a generation marker (`recipe`, `seed`, `config_hash` in `_understudy_meta`) **matches**, it does not regenerate and reports that; when it **differs**, it refuses naming the mismatch and the `reset` remedy. No silent regeneration (VI), no silent skip. |
+| D7 | **Generation on a non-empty store.** Not specified. | **Confirmed at the checkpoint.** `up --recipe` generates when the store holds **no generated rows**; when a generation marker (`recipe`, `seed`, `config_hash` in `_understudy_meta`) **matches**, it does not regenerate and reports that; when it **differs**, it refuses naming the mismatch and the `reset` remedy. No silent regeneration (VI), no silent skip. The deliberate cost — editing a recipe and re-running `up` refuses until `reset --to wipe` — is accepted; no `--regenerate` flag is invented (small, documented config surface, IX). |
 | D8 | **Time.** Real clock is the default (spec Assumptions), yet SC-002 demands byte-identical exports. | The clock is read **once per run**. Determinism tests pin `clock.start`. An unpinned real clock is **reported** (`clock-unpinned` ambiguity: time-derived values vary between runs) — never silent (FR-019). |
-| D9 | **Seed absent** everywhere. | Global seed defaults to `0`, stated in the report. Determinism is the default; there is no hidden entropy. |
+| D9 | **Seed absent** everywhere. | Global seed defaults to `0`, stated in the report. Determinism is the default; there is no hidden entropy. **The contract must state it in the same change (constitution IX): add `"default": 0` to the `seed` key in `specs/002-data-layer/contracts/config.schema.yaml`.** |
 | D10 | **Lookup tables that are not collections.** `static/lookups/*.yaml` names an `entity`; it may or may not be a live collection. | A lookup whose `entity` is a derived collection is **stored** (`origin=static`, served like any record). Otherwise it is an **in-memory named table** (reported as `lookup-only`) addressable by `lookup:` rules. Either way a `lookup` draw yields a row that exists in the table. A **fixture** `entity` that is neither a collection nor a lookup refuses naming the key (FR-005). |
+
+## Delivery: one PR for the whole slice (an explicit, recorded deviation)
+
+The repo rule `CLAUDE.md` → "One phase per change" (and constitution "Development Workflow") exists
+to keep a **reviewer and a coordinator in the loop between phases**. That machinery is deliberately
+absent here: this whole slice is driven by a single **cloud agent (Claude Code)** burning a granted
+credit allocation, with **no second orchestrator** and no coordinator watching between phases. The
+distinction is not between *reviewing* and *merging*:
+
+- **`main` stays fully protected.** One PR for the slice, and the **only** path to `main` remains a
+  merged PR with a 1-approving-review and a green `test` check. The slice PR is reviewed and merged
+  through the normal **Kanban** process after the run, exactly as a per-phase PR would be.
+- **Reviewer/CI latency vs. cloud-agent throughput.** If we split this into 11 phase PRs, the repo
+  rule would require CC to **stop and wait** at each one for a review that nobody is staffing during
+  the run. That idles the exact resource the run exists to consume — it is *throughput*, not rigour,
+  that is sacrificed. (A per-phase PR whose `test` check is the only gate, self-merged, would not be
+  review either; it would just be 11 rubber stamps with extra CI cycles.)
+- **What replaces the per-phase gate inside the run: self-review at every phase checkpoint.** Each
+  phase's **Checkpoint** line is a hard stop for CC: the phase's tests green **and** its `NC:`
+  negative control run **and** the `quickstart`-relevant scenario exercised, before the next phase
+  starts. A red phase is fixed in-run. `tasks.md` stays ordered so this is mechanical.
+- **The human checkpoint stays the one gate the run cannot pass on its own:** this task list is
+  approved before implementation starts, and the run does not merge anything.
+
+Recorded as a deviation (§"Development Workflow") for the same reason it is recorded here: the
+reasoning should travel with the decision, and the Kanban pass afterwards is where it is validated
+against the remote.
 
 ## Phase 1: Setup
 
@@ -341,9 +371,10 @@ edit the file → restart → the change is the only difference.
       `createMock` after table creation.
 - [ ] T043 [P] [US1] Test in `tests/integration/fixture-origin.test.ts`: no code path other than
       `fixtures.ts` can write a `static` row — assert by running generation, API CRUD and `wipe`
-      and diffing `static` rows byte-for-byte (SC-003 under creates, reads, lists and writes to
-      non-static rows), and **`wipe` leaves static rows and rewinds `id_seq`** (slice 1
-      semantics, consumed unchanged). Includes the `OPEN-D2` case: a test named `OPEN-D2` pins what an API `PATCH`/`DELETE` of a static-origin row does today, so the owner's later decision flips one assertion. **NC**:
+      and diffing `static` rows byte-for-byte (SC-003, narrowed per D2: fixture **files** never rewritten, fixture rows
+      applied identically on every start, and `static` rows byte-identical across generation,
+      reads, lists and `wipe`), and **`wipe` leaves static rows and rewinds `id_seq`** (slice 1
+      semantics, consumed unchanged). A `PATCH`/`PUT`/`DELETE` of a static-origin row **mutates it** (D2: API writes ARE mutations; slice 1's CRUD semantics stand) — assert the mutation is allowed and that no *other* slice-2 path writes `static`; the `OPEN-D2` placeholder is dropped (D2 resolved). **Also in this change (spec-first, D2):** amend `spec.md` FR-002/SC-003 to scope the immutability guarantee to the layers that own the rows (naming the API-write path explicitly), and add an **A4 amendment** recording the decision and its *Why* (constitution Governance). **NC**:
       temporarily route a generation insert with `origin='static'`; the test must fail.
 - [ ] T044 [P] [US1] Test that **selecting by tag works end to end for fixtures** (D1, FR-002):
       a project on `tags-api.yaml` selecting `Market_Orders` loads fixtures for the collections
@@ -718,7 +749,10 @@ falsifiable tests; Phase 11 closes the acceptance evidence.
 
 **Stop-and-review gates**: this document is the first (the human checkpoint raised before any
 implementation). The second is the end of **Phase 8**: at that point the tool either generates
-correct linked data or it does not, and Phases 9–11 do not repair that.
+correct linked data or it does not, and Phases 9–11 do not repair that. During the run, every phase
+**Checkpoint** is a **self-review** gate (tests + `NC` + the `quickstart` scenario); the **run exits
+with the whole-slice PR**, and that PR is the human/Kanban review gate before anything reaches
+`main` (see "Delivery" above).
 
 **Carried-in items** (named so they cannot be lost): **F-E** → T060/T061; **T043 store-interior
 blind spot** → T083; **contract repoint** → T005 (+T006 for the control contract, D4);
