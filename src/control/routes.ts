@@ -1,6 +1,6 @@
 /**
  * The control plane's operations (T029, T032; FR-012–FR-016, FR-018), exactly as declared in
- * `contracts/control-api.openapi.yaml`: health, operations, reset, requests, openapi.json,
+ * `contracts/control-api.openapi.json`: health, operations, reset, requests, openapi.json,
  * and the "unknown control operation" answer for anything else under the reserved prefix.
  *
  * Every answer is JSON. A failure is a `ControlError` — `{ error, message, field? }` — that

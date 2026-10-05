@@ -212,10 +212,14 @@ and 5 land in files Phase 7 touches anyway, so fold them in.
   known defect (the `operations` item pattern rejects a hyphen/dotted `operationId`, and the
   `signing`/`clock` descriptions contradict the implemented refuse-on-presence behaviour), recorded as
   open task **T048**. It is routed to the coordinator for a human checkpoint. **Do not edit it, and do
-  not work around it.** Same for `contracts/control-api.openapi.yaml` if you find the
+  not work around it.** Same for `contracts/control-api.openapi.json` if you find the
   `/openapi.json` content-type issue (it declares `application/json` while serving YAML bytes — a
   recorded contract amendment, not yours to fix).
 - **The approved spec triplet** (`spec.md`, `plan.md`). `tasks.md` is append-only for records.
+  *(Note: the contract contradictions listed above — the `operations` pattern, the reserved-key
+  descriptions, the `/openapi.json` content type — were reconciled on 2026-10-05 in the contracts
+  themselves. The `config.schema.yaml` and control-contract fences are therefore lifted; consult
+  `tasks.md`'s 2026-10-05 amendment record before touching either.)*
 - **No per-endpoint handlers.** The whole slice is one code path driven by the derived model; SC-001
   and the constitution's "Prohibited" list forbid hand-written per-endpoint handlers for standard CRUD.
 - **No secrets in the repo or in config files.** Secrets come from the environment.

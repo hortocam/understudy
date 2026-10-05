@@ -102,7 +102,7 @@ specs/001-slice-1-core/
 ├── quickstart.md        # Phase 1: runnable validation scenarios
 ├── contracts/           # Phase 1: the interfaces this feature exposes
 │   ├── README.md                      # why the control contract is checked in, not generated
-│   ├── control-api.openapi.yaml
+│   ├── control-api.openapi.json
 │   ├── config.schema.yaml
 │   └── cli.md
 ├── checklists/
@@ -133,7 +133,7 @@ src/
 ├── control/
 │   ├── server.ts            # control-plane fastify instance
 │   ├── routes.ts            # health, reset, operations, requests, teardown
-│   └── openapi.ts           # serves contracts/control-api.openapi.yaml (FR-018)
+│   └── openapi.ts           # serves contracts/control-api.openapi.json (FR-018)
 ├── store/
 │   ├── index.ts             # the Store interface — the seam (principle X)
 │   ├── sqlite.ts            # SQLite implementation

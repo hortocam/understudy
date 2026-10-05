@@ -26,11 +26,13 @@ export const configSchema: Record<string, unknown> = {
       "description": "The operations to make live. Everything else answers 501. Empty or unknown entries refuse to start.",
       "items": {
         "type": "string",
-        "pattern": "^(GET|PUT|POST|DELETE|PATCH|HEAD|OPTIONS)\\s+/.+$|^[A-Za-z_][A-Za-z0-9_]*$",
-        "description": "Either 'METHOD /path' or an operationId. Both forms are peers: a document may support only one of them, so neither is a fallback.",
+        "minLength": 1,
+        "description": "Either 'METHOD /path' (e.g. 'POST /inventory') or an operationId (any non-empty string). Both forms are peers: a document may support only one of them, so neither is a fallback. An operationId is NOT constrained to an identifier shape — OpenAPI only requires it to be a unique string, and real documents use hyphens and dots (e.g. 'get-widgets', 'api.getWidgets'). A genuinely unknown entry is refused at startup by name, not by this pattern.",
         "examples": [
           "POST /inventory",
-          "getInventoryById"
+          "getInventoryById",
+          "get-widgets",
+          "api.getWidgets"
         ]
       }
     },
@@ -111,7 +113,7 @@ export const configSchema: Record<string, unknown> = {
     "signing": {
       "type": "object",
       "additionalProperties": false,
-      "description": "RESERVED — accepted by the schema so the shape is stable, but not read in this slice. Webhook HMAC signing lands with the webhook slices; algorithm, header name and signed-content template will all be configurable. Setting it has no effect yet.",
+      "description": "RESERVED — accepted by the schema so the shape is stable, but not read in this slice, and selecting it is a STARTUP REFUSAL naming the key (it is never a silent no-op: a config key that quietly does nothing is worse than one that does not exist). Webhook HMAC signing lands with the webhook slices; algorithm, header name and signed-content template will all be configurable.",
       "properties": {
         "alg": {
           "type": "string",
@@ -126,7 +128,7 @@ export const configSchema: Record<string, unknown> = {
     "clock": {
       "type": "object",
       "additionalProperties": false,
-      "description": "RESERVED — accepted by the schema so the shape is stable, but not read in this slice. A virtual clock (fast-forward for time-dependent scenarios) is a later slice; until then the tool uses the real clock and reports that it does.",
+      "description": "RESERVED — accepted by the schema so the shape is stable, but not read in this slice, and selecting it is a STARTUP REFUSAL naming the key (it is never a silent no-op). A virtual clock (fast-forward for time-dependent scenarios) is a later slice; until then the tool uses the real clock and reports that it does.",
       "properties": {
         "mode": {
           "type": "string",
