@@ -12,7 +12,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "generate": "node scripts/generate-config-schema.mjs",
+    "generate": "node scripts/generate-config-schema.mjs && node scripts/generate-control-openapi.mjs",
     "prebuild": "npm run generate",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",

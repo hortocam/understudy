@@ -24,6 +24,15 @@ export interface RouteContext {
   crud: CrudContext;
   /** Prefix every mocked route behind this path (config `server.basePath`). */
   basePath: string;
+  /** Called once per mocked-surface request, after the response (FR-016). Absent: nothing is recorded. */
+  recordRequest?: (entry: {
+    method: string;
+    path: string;
+    status: number;
+    live: boolean;
+    durationMs: number;
+    at: string;
+  }) => void;
 }
 
 const HTTP_METHODS = ["get", "put", "post", "delete", "patch", "head", "options"] as const;
@@ -149,6 +158,7 @@ function parseJsonBody(body: unknown): ParsedBody {
 
 export function buildMockServer(context: RouteContext): FastifyInstance {
   const server = Fastify({ logger: false });
+  const markers = new WeakMap<FastifyRequest, { live: boolean }>();
 
   // Bodies are read as text and parsed here, so a malformed JSON body produces the
   // document's declared error rather than the framework's own error envelope (FR-008).
@@ -164,7 +174,35 @@ export function buildMockServer(context: RouteContext): FastifyInstance {
   const bindings = bindOperations(context.model, context.live);
   const basePath = context.basePath.replace(/\/+$/, "");
 
+  // FR-016: the request log covers the mocked surface only. `handle()` sets a marker, so a
+  // request that never reaches it (hijacked control traffic) is never logged.
+  const { recordRequest } = context;
+  if (recordRequest) {
+    const started = new WeakMap<FastifyRequest, { at: string; clock: number }>();
+    server.addHook("onRequest", (request, _reply, done) => {
+      started.set(request, { at: new Date().toISOString(), clock: performance.now() });
+      done();
+    });
+    server.addHook("onResponse", (request, reply, done) => {
+      const start = started.get(request);
+      const marker = markers.get(request);
+      if (start && marker) {
+        recordRequest({
+          method: request.method.toUpperCase(),
+          path: request.url.split("?")[0] ?? request.url,
+          status: reply.statusCode,
+          live: marker.live,
+          durationMs: Math.round(performance.now() - start.clock),
+          at: start.at,
+        });
+      }
+      done();
+    });
+  }
+
   const handle = async (request: FastifyRequest, reply: FastifyReply): Promise<FastifyReply> => {
+    const marker = { live: false };
+    markers.set(request, marker);
     const rawPath = request.url.split("?")[0] ?? request.url;
     if (basePath.length > 0 && rawPath !== basePath && !rawPath.startsWith(`${basePath}/`)) {
       return reply.code(404).send({ error: "not_found", message: `no operation is declared for ${rawPath}` });
@@ -200,6 +238,7 @@ export function buildMockServer(context: RouteContext): FastifyInstance {
         .send(unboundOperationBody(declared ?? { method, path: route.template }));
     }
 
+    marker.live = true;
     const params: Record<string, string> = {};
     const match = route.regex.exec(path);
     if (match) {
