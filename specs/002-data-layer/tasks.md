@@ -691,17 +691,17 @@ proven **and** proven falsifiable.
       `vitest run` excludes `tests/live/`. The outcome is recorded in the PR body and a
       **new** `specs/002-data-layer/live-derivation.md` (the approved `research.md` is not
       edited).
-- [ ] T088 **Run `quickstart.md` end to end** against a built `dist/` and record the output as
+- [X] T088 **Run `quickstart.md` end to end** against a built `dist/` and record the output as
       `specs/002-data-layer/quickstart-run.txt` (slice 1's precedent), scenarios 1–9, **with any
       step that did not behave as written called out and fixed — in the quickstart (and say
       so) or in the code (and say so)**. D6's divergences are named there, not hidden.
-- [ ] T089 [P] Documentation (constitution IX): `README.md` reflects the shipped CLI surface
+- [X] T089 [P] Documentation (constitution IX): `README.md` reflects the shipped CLI surface
       (`init`, `generate`, `up --recipe/--seed`) and **every new config key** — `recipe`, `seed`,
       `paths.*`, `entities.<X>.{idField,writes,ids.*,relations.*.onDelete}`, `clock.*`, recipe
       keys (`count`, `perParent`, `fields`, `constraints`, `redraws`, `generators`), the
       behaviour layer — each with a **runnable example**; add a test that fails when a key in
       the contract has no mention in `README.md` or the contract's own `examples`.
-- [ ] T090 Gate and evidence: `npm ci && npm run lint && npm run typecheck && npm test && npm run
+- [X] T090 Gate and evidence: `npm ci && npm run lint && npm run typecheck && npm test && npm run
       build && node dist/cli/index.js --help`, with real output pasted; confirm `git diff
       origin/main -- specs/001-slice-1-core` is **empty** and `specs/002-data-layer/{spec,plan,
       research,data-model}.md` are unchanged; tick every task `[X]` in a final commit.

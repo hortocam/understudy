@@ -9,7 +9,6 @@
  */
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
-import { createClock } from "./clock.js";
 import { buildGenerationPlan } from "./data/plan.js";
 import { InitConflictError } from "./errors.js";
 import { renderStartupReport } from "./logging.js";
@@ -179,12 +178,15 @@ export async function scaffoldProject(options: InitOptions): Promise<InitResult>
     notSelected: resolved.notImplemented,
     model,
     selection: resolved,
-    clock: createClock(),
     plan,
   });
 
   const dir = resolve(options.dir);
-  const specValue = URL_LIKE.test(options.spec) ? options.spec : relative(dir, isAbsolute(options.spec) ? options.spec : resolve(options.spec)) || options.spec;
+  // A spec inside the project is written relative to it (the project stays movable); one outside is
+  // written absolute rather than as a `../../..` climb.
+  const specAbsolute = isAbsolute(options.spec) ? options.spec : resolve(options.spec);
+  const specRelative = relative(dir, specAbsolute);
+  const specValue = URL_LIKE.test(options.spec) ? options.spec : specRelative.startsWith("..") ? specAbsolute : specRelative;
   const files: Record<string, string> = {
     "understudy.yaml": configText(specValue, selection),
     "dynamic/starter.yaml": starterRecipe(model),

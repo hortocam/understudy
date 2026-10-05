@@ -1,0 +1,230 @@
+# Recorded quickstart run (T088)
+
+Run against a built `dist/` with `node dist/cli/index.js`, in a throwaway working directory.
+Deviations from the quickstart as first written are listed in the "Corrections" section of
+`quickstart.md`. Scenario 9: the vendor host (pointofsaleapi.stubhub.net) answered HTTP 403 from
+this environment, so the real-document derivation (T087) was NOT performed; the harness itself was
+verified against a local stand-in, which is not the vendor document.
+
+recorded: 2026-10-05T22:11:14Z  commit: 2fd3b14  node: v22.22.0  workdir: /tmp/tmp.j9YjOVxCLM
+
+################################################################
+## Prerequisites: build is current; the CLI exposes init and generate
+################################################################
+Commands:
+  up [options]        start the mock from a config and wait until its control
+                      plane is healthy
+  down [options]      tear the running mock down and wait until its port is
+                      released
+  init [options]      scaffold the configuration layers and understudy.yaml for
+                      a specification, and print the inferred collection report
+  generate [options]  apply a named generation recipe to the running mock and
+
+################################################################
+## Scenario 1 — init scaffolds from the tool's own understanding (FR-020, US4)
+################################################################
+understudy: /home/user/understudy-slice2/tests/fixtures/inventory-api.yaml
+  spec version 3.1.0 (normalised to 3.1.0), sha256 bbcf00b627f1
+  clock: real
+
+live operations (6):
+  GET /inventory (listInventory)
+  POST /inventory (createInventory)
+  GET /inventory/{id} (getInventoryById)
+  DELETE /inventory/{id} (deleteInventory)
+  PATCH /inventory/{id} (updateInventory)
+  GET /events (listEvents)
+
+not selected (0):
+
+entities derived (2):
+  Inventory (/inventory instance /inventory/{id}) id=id:integer space=integer paging=offset-limit params=[limit:paging,offset:paging,sku:filter] name=schema-title
+  Event (/events) id=id:integer space=integer paging=none-declared params=[] name=schema-title
+
+relationships inferred (0):
+
+undetermined links (0) — reported, not acted on:
+
+generation order: Event, Inventory
+
+indexed because the document declares them filterable/sortable:
+  Inventory.sku (filter parameter "sku")
+
+ambiguities (1):
+  no-list-parameters at /events: Event declares no list parameters; every list request returns the full collection unpaged and unsorted
+
+wrote 7 files under /tmp/tmp.j9YjOVxCLM/scratch-pos:
+  wrote /tmp/tmp.j9YjOVxCLM/scratch-pos/behavior/webhooks.yaml.example
+  wrote /tmp/tmp.j9YjOVxCLM/scratch-pos/dynamic/ci-small.yaml.example
+  wrote /tmp/tmp.j9YjOVxCLM/scratch-pos/dynamic/starter.yaml
+  wrote /tmp/tmp.j9YjOVxCLM/scratch-pos/imports/events.mapping.yaml.example
+  wrote /tmp/tmp.j9YjOVxCLM/scratch-pos/static/entities/venues.yaml.example
+  wrote /tmp/tmp.j9YjOVxCLM/scratch-pos/static/lookups/inventory-statuses.yaml.example
+  wrote /tmp/tmp.j9YjOVxCLM/scratch-pos/understudy.yaml
+
+next: review the report above, pin anything undetermined in understudy.yaml, then `ustdy up --recipe starter`.
+--- files written:
+./behavior/webhooks.yaml.example
+./dynamic/ci-small.yaml.example
+./dynamic/starter.yaml
+./imports/events.mapping.yaml.example
+./static/entities/venues.yaml.example
+./static/lookups/inventory-statuses.yaml.example
+./understudy.yaml
+--- understudy.yaml (first 12 lines):
+# understudy project — written by `ustdy init`. Every key is optional except spec and operations.
+spec: "/home/user/understudy-slice2/tests/fixtures/inventory-api.yaml"   # a path (relative to this file) or a URL; a URL is the only network call the tool makes
+
+# The operations to make live. Everything else answers 501 "not implemented". An entry is a tag,
+# `METHOD /path`, or an operationId — three peers; a tag containing a space is written with '_'.
+operations:
+  - "GET /inventory"
+  - "POST /inventory"
+  - "GET /inventory/{id}"
+  - "DELETE /inventory/{id}"
+  - "PATCH /inventory/{id}"
+  - "GET /events"
+
+################################################################
+## Scenario 2 — fixtures are byte-identical forever (FR-002, SC-003, US1)
+################################################################
+fixture rows before: 2, after 3 API creates: 2; total venues now: 5
+OK: the fixture rows are byte-identical before and after API writes (diff is empty)
+OK: restart reproduces the same fixture rows
+
+################################################################
+## Scenario 3 — generation is deterministic, and independent per collection (FR-016, SC-002, SC-007, US3)
+################################################################
+run1: 31849 bytes sha256 f9dec1d9f5e671bf…  run2: 31849 bytes sha256 f9dec1d9f5e671bf…
+OK: same seed, byte-identical
+OK: a different seed gives different data
+-- independence: ci-small vs ci-small-plus (adds an UNRELATED collection, AuditNote); existing collections compared
+AuditNote rows now: 25
+OK: adding an unrelated collection leaves every existing collection's records unchanged
+
+################################################################
+## Scenario 4 — fixtures and generated identities never collide (FR-017/018, SC-006, US6)
+################################################################
+duplicate ids in /venues: []
+duplicate ids in /events: []
+duplicate ids in /inventory: []
+fixture identities (venues): [1,2]   generated start: 100000
+-- an overlapping configuration must refuse to start, naming the collection:
+understudy: refusing to start: 1 configuration problem:
+  understudy.yaml: entities.Venue.ids.generatedStart — fixture identity 1 of Venue lies at or above the generated range start 1; the ranges overlap
+{"time":"2026-10-05T22:11:29.185Z","level":"error","message":"1 configuration problem:\n  understudy.yaml: entities.Venue.ids.generatedStart — fixture identity 1 of Venue lies at or above the generated range start 1; the ranges overlap","error":"CONFIG_REFUSED"}
+ustdy: 1 configuration problem:
+  understudy.yaml: entities.Venue.ids.generatedStart — fixture identity 1 of Venue lies at or above the generated range start 1; the ranges overlap
+exit status: 1
+
+################################################################
+## Scenario 5 — the report tells the truth about inference (FR-007, SC-005, US4)
+################################################################
+relationships inferred (2):
+  Event -> Venue via venueId [one, convention]
+  Listing -> Order via orderId [one, convention]
+
+undetermined links (8) — reported, not acted on:
+  Event.externalId (no single target) [convention]
+    pin it with entities.Event.relations.externalId: { to: <Collection>.<id> } if it is a link
+  Order.externalId (no single target) [convention]
+    pin it with entities.Order.relations.externalId: { to: <Collection>.<id> } if it is a link
+  Order.eventId -> Event [convention]  candidates: eventId, primaryEventId, viagogoEventId
+    pin it with entities.Order.relations.eventId: { to: <Collection>.<id> } if it is a link
+  Order.viagogoEventId -> Event [convention]  candidates: eventId, primaryEventId, viagogoEventId
+    pin it with entities.Order.relations.viagogoEventId: { to: <Collection>.<id> } if it is a link
+  Order.primaryEventId -> Event [convention]  candidates: eventId, primaryEventId, viagogoEventId
+    pin it with entities.Order.relations.primaryEventId: { to: <Collection>.<id> } if it is a link
+  Listing.externalId (no single target) [convention]
+    pin it with entities.Listing.relations.externalId: { to: <Collection>.<id> } if it is a link
+  Listing.referenceId (no single target) [convention]
+    pin it with entities.Listing.relations.referenceId: { to: <Collection>.<id> } if it is a link
+  Customer.externalId (no single target) [convention]
+    pin it with entities.Customer.relations.externalId: { to: <Collection>.<id> } if it is a link
+
+generation order: Customer, Order, Listing, Venue, Event
+
+################################################################
+## Scenario 6 — a stated invariant is enforced or the run fails loudly (FR-013)
+################################################################
+understudy: refusing to start: collection Inventory: the invariant "price > 1000000" could not be satisfied within 5 redraws; nothing was stored
+{"time":"2026-10-05T22:11:30.723Z","level":"error","message":"collection Inventory: the invariant \"price > 1000000\" could not be satisfied within 5 redraws; nothing was stored","error":"INVARIANT_VIOLATED"}
+ustdy: collection Inventory: the invariant "price > 1000000" could not be satisfied within 5 redraws; nothing was stored
+exit status: 1
+-- and nothing was stored:
+state.db
+Venue [ { origin: 'static', n: 2 } ]
+Event [ { origin: 'static', n: 2 } ]
+Inventory []
+
+################################################################
+## Scenario 7 — the behaviour layer is validated but not run (spec boundary)
+################################################################
+understudy: refusing to start: behavior/webhooks.yaml: targets.pos.urll — unknown key "urll" is not allowed (behavior layer)
+{"time":"2026-10-05T22:11:31.624Z","level":"error","message":"behavior/webhooks.yaml: targets.pos.urll — unknown key \"urll\" is not allowed (behavior layer)","error":"CONFIG_LAYER_INVALID"}
+ustdy: behavior/webhooks.yaml: targets.pos.urll — unknown key "urll" is not allowed (behavior layer)
+exit status: 1
+
+################################################################
+## Scenario 8 — performance (SC-008)
+################################################################
+generated and serving after 2.883153104 s
+  venues: 32 records
+  events: 817 records
+  inventory: 5316 records
+  audit-notes: 500 records
+  inventory-statuses: 54 records
+  page of 25 from /inventory?limit=25&offset=1000: 25 records
+
+################################################################
+## FR-021 — apply a recipe to a RUNNING mock (ustdy generate), then wipe
+################################################################
+venues before: 2
+generated: recipe ci-small, seed 42, clock real pinned
+created, by collection and origin:
+  Venue: generated 3  (total: generated 3, static 2)
+  Event: generated 13  (total: generated 13, static 2)
+  Inventory: generated 117  (total: generated 117)
+venues after: 5
+already applied: recipe ci-small, seed 42 — the store holds this recipe, seed and configuration; nothing regenerated
+records in the store, by collection and origin:
+  Event: generated 13, static 2
+  Inventory: generated 117
+  InventoryStatus: static 4
+  Venue: generated 3, static 2
+ustdy: the store already holds generated records with seed "42", not "1"; run `ustdy reset --to wipe` first
+exit status: 1
+reset (wipe): rows removed per entity
+  Venue: 3
+  Event: 13
+  Inventory: 117
+  InventoryStatus: 0
+  AuditNote: 0
+generated: recipe ci-small, seed 1, clock real pinned
+created, by collection and origin:
+  Venue: generated 3  (total: generated 3, static 2)
+  Event: generated 13  (total: generated 13, static 2)
+  Inventory: generated 94  (total: generated 94)
+
+################################################################
+## Scenario 9 — the live derivation, opt-in and non-blocking (research §0)
+################################################################
+-- the default test run does not include it:
+0
+-- against the real vendor document:
+ ❯ tests/live/live-derivation.test.ts (1 test | 1 failed) 157ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+SpecUnreadableError: cannot read the OpenAPI document at https://pointofsaleapi.stubhub.net/swagger/v1/swagger.json: HTTP 403 Forbidden
+     60|     } catch (error) {
+     61|       throw new SpecUnreadableError(source, messageOf(error));
+ Test Files  1 failed (1)
+-- the harness itself, against a local stand-in (NOT the vendor document):
+document: OpenAPI 3.1.0, 10 paths, 20 operations, 20 with an operationId, 0 tags
+selection: 20 METHOD /path entries -> 20 live operations (forms: method-path)
+collections derived: 5
+identity spaces: {"integer":5}
+paging styles: {"offset-limit":5}
+links decided: 2 {"convention":2}
+links undetermined: 8 (1 sibling ties to a single parent; 5 known-ambiguous names with no single target)
+PINNING needed to decide every undetermined link: at most 6 pins (1 ties + 5 ambiguous names)
+      Tests  1 passed (1)
