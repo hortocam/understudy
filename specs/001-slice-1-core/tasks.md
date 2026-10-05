@@ -202,13 +202,13 @@ confirm each command reports a connection failure instead of doing the work loca
 relationships and hide others; confirm the report names the resources, states each relationship's
 evidence source, and calls out what it could not determine.
 
-- [ ] T038 [P] [US4] Unit test in `tests/unit/report.test.ts`: given a derived model, the report
+- [X] T038 [P] [US4] Unit test in `tests/unit/report.test.ts`: given a derived model, the report
       contains every resource, every relationship **with its evidence**, and every ambiguity; and
       a `convention`-sourced link is rendered differently from a `configured` one (SC-006, FR-023).
       Fails first.
-- [ ] T039 [US4] Render the report: human-readable to stdout, and the same data as one structured
+- [X] T039 [US4] Render the report: human-readable to stdout, and the same data as one structured
       log line (FR-024). Verify both from one source in T038.
-- [ ] T040 [US4] Refusal paths: prove each T004 error produces a human-readable, cause-naming
+- [X] T040 [US4] Refusal paths: prove each T004 error produces a human-readable, cause-naming
       message and a non-zero exit — an unreadable document, an unresolvable `$ref`, an empty
       selection, an unknown operation, an invalid config, an unwritable store, a port in use.
 
@@ -218,15 +218,15 @@ evidence source, and calls out what it could not determine.
 
 ## Phase 7: Polish & Cross-Cutting
 
-- [ ] T041 [P] Cross-instance isolation test in `tests/integration/isolation.test.ts`: two
+- [X] T041 [P] Cross-instance isolation test in `tests/integration/isolation.test.ts`: two
       instances with distinct ports and store files, no shared state, no cross-talk (SC-007).
-- [ ] T042 [P] Prove no outbound traffic beyond a URL-supplied spec (SC-008, FR-022) — run the full
+- [X] T042 [P] Prove no outbound traffic beyond a URL-supplied spec (SC-008, FR-022) — run the full
       lifecycle against a file spec and assert no outbound connection.
-- [ ] T043 [P] Large-collection test: seed one collection past the page size, list it paged, and
+- [X] T043 [P] Large-collection test: seed one collection past the page size, list it paged, and
       assert memory does not scale with the collection.
-- [ ] T044 Documentation: `README.md` reflects the shipped CLI surface and the config keys; each
+- [X] T044 Documentation: `README.md` reflects the shipped CLI surface and the config keys; each
       config key has an example (constitution IX).
-- [ ] T045 Run `quickstart.md` end to end against a built `dist/` and record the output as the
+- [X] T045 Run `quickstart.md` end to end against a built `dist/` and record the output as the
       feature's acceptance evidence. Any step that does not behave as written is a defect in the
       quickstart or the code — decide which, and fix the right one.
 
