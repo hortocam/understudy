@@ -3,6 +3,10 @@
 A runnable guide that proves the feature works end to end. It is also the script the contract
 suite automates; every step below has a matching test in `tests/contract/`.
 
+Commands below use `ustdy`. After `npm ci && npm run build`, run it either as
+`node dist/cli/index.js <command>` (always available, offline) or, if the package is linked onto
+your `PATH`, as `ustdy <command>` — the two are the same program.
+
 ## Prerequisites
 
 Node 22+ and a checkout of this repository.
@@ -42,7 +46,7 @@ Time this step: from a clean checkout, **`npm ci` → first successful response 
 5 minutes** (SC-001). Note the wall-clock start before §1 and the time the mock answers in §4.
 
 ```bash
-npx ustdy up --config ./understudy.yaml
+node dist/cli/index.js up --config ./understudy.yaml
 ```
 
 **Expected**: the process prints the startup report and starts serving. The report must name, each
@@ -57,13 +61,13 @@ on its own line and machine-checkably (SC-006):
   a document with no declared list parameters.
 
 ```bash
-# The report is also emitted as one structured log line; assert the parts are present
-# rather than reading the prose by eye. Adjust the field names to the shipped schema.
-npx ustdy up --config ./understudy.yaml --log-json 2>&1 | head -1 | jq -e \
+# The report is ALSO emitted as one structured log line, interleaved with the human text on
+# stdout. Extract that line and assert its parts, rather than reading the prose by eye.
+node dist/cli/index.js up --config ./understudy.yaml 2>&1 | \
+  grep '"message":"startup report"' | head -1 | jq -e \
   '.report.live | length == 5' \
   && echo "SC-006: report carries the live set"
 ```
-
 
 ## 4. Prove CRUD persists across a restart (SC-002, FR-010)
 
@@ -74,8 +78,8 @@ curl -s -X POST localhost:8080/inventory -H 'content-type: application/json' \
 ID=$(jq -r .id /tmp/created.json)     # an integer, >= 100000
 curl -s localhost:8080/inventory/$ID  # the record, in the document's own shape
 
-npx ustdy down
-npx ustdy up --config ./understudy.yaml
+node dist/cli/index.js down
+node dist/cli/index.js up --config ./understudy.yaml
 curl -s localhost:8080/inventory/$ID  # STILL the record: it survived the restart
 ```
 
@@ -106,7 +110,8 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST localhost:8080/inventory \
 curl -s localhost:8080/__understudy/health      # { status: ok, store: { reachable: true } }
 curl -s localhost:8080/__understudy/operations  # { live: [...], notImplemented: [...] }
 curl -s localhost:8080/__understudy/requests    # the requests from steps 4-6
-curl -s -X POST localhost:8080/__understudy/reset -d '{"mode":"wipe"}'
+curl -s -X POST localhost:8080/__understudy/reset -H 'content-type: application/json' \
+  -d '{"mode":"wipe"}'
 curl -s localhost:8080/__understudy/requests?status=501
 curl -s localhost:8080/__understudy/openapi.json # this API's own description
 ```
@@ -114,10 +119,10 @@ curl -s localhost:8080/__understudy/openapi.json # this API's own description
 ## 8. Prove the CLI adds no logic (SC-005, FR-019)
 
 ```bash
-npx ustdy ops list
-npx ustdy logs requests --status 501
-npx ustdy reset --to wipe
-npx ustdy down
+node dist/cli/index.js ops list
+node dist/cli/index.js logs requests --status 501
+node dist/cli/index.js reset --to wipe
+node dist/cli/index.js down
 ```
 
 **Expected**: each command's output agrees with the control API's own answer for the same
@@ -126,12 +131,27 @@ than falling back to doing the work locally — that is what proves it is a clie
 
 ## 9. Prove instance isolation (SC-007)
 
+Two instances need **distinct ports and distinct store files** — a shared store file is shared
+state, not isolation. Give the second instance its own config:
+
 ```bash
-npx ustdy up --config ./understudy.yaml --port 8080 &
-npx ustdy up --config ./understudy.yaml --port 8081 &
-curl -s -X POST localhost:8080/inventory -d '{"sku":"A","quantity":1}'
-curl -s localhost:8081/inventory     # EMPTY: no cross-talk between instances
+cat > ./understudy-b.yaml <<'YAML'
+spec: ./tests/fixtures/inventory-api.yaml
+operations: [POST /inventory, GET /inventory]
+server:  { port: 8081 }
+storage: { driver: sqlite, path: ./.understudy/state-b.db }
+YAML
+
+node dist/cli/index.js up --config ./understudy.yaml   --port 8080 &
+node dist/cli/index.js up --config ./understudy-b.yaml --port 8081 &
+sleep 2
+curl -s -X POST localhost:8080/inventory -H 'content-type: application/json' \
+  -d '{"sku":"A","quantity":1}'
+curl -s localhost:8081/inventory     # EMPTY []: no cross-talk between instances
 ```
+
+**Expected**: the second instance answers `[]` — the record created on 8080 is not visible on
+8081, because each instance has its own store file.
 
 ## 10. Prove no hidden outbound calls (SC-008, FR-022)
 
