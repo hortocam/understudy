@@ -9,6 +9,17 @@ export const META_TABLE = "_understudy_meta";
 export const REQUESTS_TABLE = "_requests";
 export const SCHEMA_VERSION = "1";
 
+/**
+ * The tool's own tables, by exact name — never a prefix.
+ *
+ * A derived resource's table is named after the resource, which is named after a
+ * response-schema `title` or a collection path segment; a segment may legitimately begin
+ * with `_` (a vendor's `/_events`, `/__admin`). Excluding metadata by a `'_%'` prefix would
+ * therefore swallow such a resource's rows out of the unscoped wipe and `removeByOrigin`
+ * (HANDOFF-p5-p7 §5 item 4). An explicit set removes the whole collision class.
+ */
+export const META_TABLES: ReadonlySet<string> = new Set([META_TABLE, REQUESTS_TABLE]);
+
 /** Quote an SQL identifier, escaping embedded quotes. */
 export function quoteIdent(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;

@@ -105,6 +105,29 @@ describe("sqlite store", () => {
     store.close();
   });
 
+  it("wipes a resource whose table name begins with an underscore (HANDOFF §5 item 4)", () => {
+    // A vendor's `/_events` derives a resource named `_event`, whose table name begins with
+    // `_`. The store's resource enumeration must not treat it as a metadata table.
+    const store = tempStore();
+    store.insert("_event", "1", { id: 1 }, "runtime");
+    store.insert("Inventory", "1", { id: 1 }, "runtime");
+
+    expect(store.removeByOrigin("runtime")).toBe(2);
+    expect(store.list("_event")).toHaveLength(0);
+
+    store.insert("_event", "2", { id: 2 }, "runtime");
+    store.wipe();
+    expect(store.list("_event")).toHaveLength(0);
+
+    // Negative control: the tool's own tables survive — the fix excluded those by exact
+    // name rather than deleting every `_`-prefixed table.
+    store.setMeta("still_here", "yes");
+    expect(store.getMeta("still_here")).toBe("yes");
+    store.appendRequest({ method: "GET", path: "/", status: 200, live: true, durationMs: 1, at: "t" });
+    expect(store.listRequests()).toHaveLength(1);
+    store.close();
+  });
+
   it("refuses an unwritable store location", () => {
     const dir = mkdtempSync(join(tmpdir(), "understudy-store-"));
     const blocker = join(dir, "not-a-directory");

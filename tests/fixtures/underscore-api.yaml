@@ -1,0 +1,129 @@
+openapi: 3.1.0
+info:
+  title: Underscore API
+  version: 1.0.0
+  description: >
+    Fixture for the unscoped-wipe collision defect (HANDOFF-p5-p7 §5 item 4). One collection
+    whose path segment begins with `_` — deriving a resource name and therefore a table name
+    that begins with `_` — sits alongside a normal-named collection that acts as the positive
+    control. Neither representation schema declares a `title`, so each resource name comes
+    from its collection path segment, which is the derivation the defect hangs on.
+paths:
+  /notes:
+    get:
+      operationId: listNotes
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Note" }
+    post:
+      operationId: createNote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NoteCreate" }
+      responses:
+        "201":
+          description: created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Note" }
+  /notes/{id}:
+    get:
+      operationId: getNote
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Note" }
+        "404":
+          description: no note with that identity
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /_events:
+    get:
+      operationId: listUnderscoreEvents
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/UnderscoreEvent" }
+    post:
+      operationId: createUnderscoreEvent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UnderscoreEventCreate" }
+      responses:
+        "201":
+          description: created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UnderscoreEvent" }
+  /_events/{id}:
+    get:
+      operationId: getUnderscoreEvent
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UnderscoreEvent" }
+        "404":
+          description: no underscore event with that identity
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+components:
+  schemas:
+    Note:
+      type: object
+      required: [id, text]
+      properties:
+        id: { type: integer }
+        text: { type: string }
+    NoteCreate:
+      type: object
+      required: [text]
+      additionalProperties: false
+      properties:
+        text: { type: string }
+    UnderscoreEvent:
+      type: object
+      required: [id, kind]
+      properties:
+        id: { type: integer }
+        kind: { type: string }
+    UnderscoreEventCreate:
+      type: object
+      required: [kind]
+      additionalProperties: false
+      properties:
+        kind: { type: string }
+    Error:
+      type: object
+      required: [error, message]
+      properties:
+        error: { type: string }
+        message: { type: string }
