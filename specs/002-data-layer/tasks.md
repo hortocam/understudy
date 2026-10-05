@@ -669,17 +669,17 @@ proven **and** proven falsifiable.
 
 ## Phase 11: Polish & Cross-Cutting
 
-- [ ] T085 [P] No-secrets and no-outbound sweep: `tests/integration/outbound.test.ts` (extend) runs
+- [X] T085 [P] No-secrets and no-outbound sweep: `tests/integration/outbound.test.ts` (extend) runs
       the full slice-2 lifecycle — fixtures, generation, `init`, `generate` — against a **file**
       spec and asserts **zero outbound connections** and **zero `process.env` reads in `src/`**
       (T002 grep). `${VAR}` strings in behaviour files stay inert text.
-- [ ] T086 [P] No-per-endpoint-handler guard (SC-001, constitution "Prohibited"): test that
+- [X] T086 [P] No-per-endpoint-handler guard (SC-001, constitution "Prohibited"): test that
       `src/data/` and `src/mock/` contain **no branch on a collection or field name** — a
       structural test that runs generation over two *different* fixture documents with identical
       engine code and asserts the engine has no document-specific identifiers (scan `src/data/`
       for quoted names drawn from the fixture documents). **NC**: add a `if (name === "Event")`
       to a copy; the scan must flag it.
-- [ ] T087 **Opt-in live derivation** — `tests/live/live-derivation.test.ts`, skipped unless
+- [X] T087 **Opt-in live derivation** — `tests/live/live-derivation.test.ts`, skipped unless
       `USTDY_LIVE_SPEC` is set (Scenario 9; **never CI-blocking, never vendored** — licence
       unresolved). Fetch on demand from
       `https://pointofsaleapi.stubhub.net/swagger/v1/swagger.json`, **verify the sha256 equals

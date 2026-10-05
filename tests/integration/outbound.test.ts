@@ -148,3 +148,31 @@ describe("no hidden outbound calls (SC-008, FR-022)", () => {
     expect(report.external[0]?.kind).toBe("fetch");
   });
 });
+
+describe("slice 2 opens no socket either (T085, constitution VIII)", () => {
+  it("fixtures, generation, the behaviour layer (with a non-loopback webhook target), POST /generate, `init` and `generate` make zero external connections", async () => {
+    const { startGen, fixturesProject } = await import("../helpers/project.js");
+    const { runCli } = await import("../../src/cli/program.js");
+    const files = {
+      ...fixturesProject("gen-project"),
+      // A webhook target on a host that is NOT loopback: slice 2 parses and validates it and must never dial it.
+      "behavior/webhooks.yaml": "targets:\n  pos:\n    url: http://hooks.example.invalid/pos\nsubscriptions:\n  - { name: s, on: Venue.created, target: pos, template: '{ \"a\": 1 }' }\n",
+    };
+    const outDir = newStoreDir();
+    const { report } = await withOutboundSpy(async () => {
+      const started = await startGen("ci-small", { files });
+      mock = started.mock;
+      const control = `${mock.controlUrl}${mock.controlPrefix}`;
+      await fetch(`${control}/reset`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      await fetch(`${control}/generate`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ recipe: "ci-small" }) });
+      await fetch(`${mock.baseUrl}/venues`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "Runtime" }) });
+      const io = { out: () => undefined, err: () => undefined, env: {} };
+      await runCli(["node", "ustdy", "generate", "--recipe", "ci-small", "--seed", "3", "--control-url", control], io);
+      await runCli(["node", "ustdy", "init", "--spec", fixturePath("shop-api.yaml"), "--dir", outDir], io);
+      await mock.close();
+      mock = undefined;
+    });
+    expect(report.external).toEqual([]);
+    expect(report.records.filter((r) => /example\.invalid/.test(r.target))).toEqual([]);
+  });
+});
