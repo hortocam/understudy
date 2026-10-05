@@ -30,7 +30,8 @@ export type ErrorCode =
   | "RECIPE_NOT_FOUND"
   | "GENERATION_MARKER_MISMATCH"
   | "FIXTURE_NONCONFORMING"
-  | "GENERATION_REFUSED";
+  | "GENERATION_REFUSED"
+  | "STORE_SCHEMA_CONFLICT";
 
 function describe(value: unknown): string {
   if (typeof value === "string") return value;
@@ -251,5 +252,13 @@ export class AmbiguousSelectionError extends UnderstudyError {
       `the operation selection entry ${describe(entry)} is ambiguous: it matches ${matches.join(" and ")}; spell it unambiguously`,
       entry,
     );
+  }
+}
+
+
+/** A store table cannot take a newly decided constraint because existing rows violate it. */
+export class StoreSchemaConflictError extends UnderstudyError {
+  constructor(resource: string, detail: string) {
+    super("STORE_SCHEMA_CONFLICT", `cannot change the stored shape of ${resource}: ${detail}`, resource);
   }
 }

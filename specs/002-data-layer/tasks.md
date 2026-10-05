@@ -229,38 +229,38 @@ refuses with one message shape; no data has been written. `tests/unit` green.
 **Purpose**: the slice-1 deferrals data-model.md §3 names, added without changing a single
 existing `Store` method.
 
-- [ ] T022 [P] [FND] Tests for the stored model in `tests/unit/store-slice2.test.ts` against a
+- [X] T022 [P] [FND] Tests for the stored model in `tests/unit/store-slice2.test.ts` against a
       real temp SQLite file: `_id_ranges` exists with the data-model columns; it is in
       `META_TABLES` **by exact name** (the underscore-prefix lesson from slice 1's HANDOFF §5
       item 4 — a derived resource named `_id_ranges`-adjacent must not be swallowed by wipe);
       `_understudy_meta` accepts `recipe`, `seed`, `config_hash`, `clock_mode`; unwritten
       resources keep slice 1's DDL byte-for-byte (slice 1's `store.test.ts` DDL assertions stay
       green untouched). Fails first.
-- [ ] T023 [FND] Implement `_id_ranges` DDL in `src/store/schema.ts`, `Store.reserveRange /
+- [X] T023 [FND] Implement `_id_ranges` DDL in `src/store/schema.ts`, `Store.reserveRange /
       readRange / advanceRange` (additive), and the meta keys. `wipe` and `removeByOrigin` keep
       their semantics (`removeByOrigin("generated")` must also reset that collection's
       `_id_ranges.next` to its reserved start in the same transaction so wipe + regenerate is
       reproducible — test it).
-- [ ] T024 [P] [FND] Tests for **foreign keys** in `tests/unit/store-fk.test.ts`: a `decided`
+- [X] T024 [P] [FND] Tests for **foreign keys** in `tests/unit/store-fk.test.ts`: a `decided`
       relationship produces a real `REFERENCES` constraint (assert via `PRAGMA
       foreign_key_list`); `onDelete: restrict` refuses deleting a referenced parent;
       `cascade` removes children; `setNull` nulls the child field; an **`undetermined` link
       produces no constraint** (assert absence — the data-model §3 "last row"); `foreign_keys`
       pragma is on for every connection; an orphan insert is refused. Includes the integer-FK
       vs TEXT-id cast the single-`doc` table forces. Fails first.
-- [ ] T025 [FND] Implement FK constraints in `src/store/sqlite.ts`:
+- [X] T025 [FND] Implement FK constraints in `src/store/sqlite.ts`:
       `ensureResource(resource, { foreignKeys, indexes })`. **Spike inside this task**: SQLite's
       rules for foreign keys on generated columns; if a generated column cannot be a child key
       with the required actions, maintain a real `fk_<field>` column set by the store from `doc`
       on insert/update inside the same statement. Record the outcome in the task's commit message
       and PR body. Existing one-argument `ensureResource(resource)` is unchanged.
-- [ ] T026 [P] [FND] Tests for **indexes** in `tests/unit/store-index.test.ts`: each declared
+- [X] T026 [P] [FND] Tests for **indexes** in `tests/unit/store-index.test.ts`: each declared
       filterable/sortable field gets `"<resource>_<field>_idx"`; `EXPLAIN QUERY PLAN` of a
       filtered `listPaged` uses it (**not** a full scan); the *reason* (the declared list
       parameter that caused it) is available to the report. Fails first.
-- [ ] T027 [FND] Implement the indexes in `src/store/sqlite.ts` (the `json_extract` form in
+- [X] T027 [FND] Implement the indexes in `src/store/sqlite.ts` (the `json_extract` form in
       data-model §3) and thread the reason into `Resource`/`StartupReport` (T043).
-- [ ] T028 [P] [FND] Tests for `Store.insertMany` (one transaction: all rows or none — a
+- [X] T028 [P] [FND] Tests for `Store.insertMany` (one transaction: all rows or none — a
       mid-batch failure leaves **zero** rows and an unadvanced range, principle V's narrow
       form), `Store.countByOrigin()` (per resource and total), and `Store.listIdentities(resource)`
       (ordered, ids only, for reference draws). Fails first. Then implement them.
@@ -786,3 +786,19 @@ nowhere.
   selected one) so a typo cannot hide in the dataset switched to next; a `relations.to` must
   target the collection's identity field (a link resolves to a record's identity); `lookup:` names a
   fixture table; `choice` values are checked against the property's own schema.
+- **T025 — spike outcome (FK mechanism).** SQLite *accepts* a generated column as a foreign-key
+  child key for `RESTRICT`/`CASCADE`, but raises `cannot UPDATE generated column` when the parent
+  delete is *prepared* under `ON DELETE SET NULL`. So the store keeps a **real** `fk_<field>` TEXT
+  column maintained from the record body on every insert/update (`CAST(json_extract(?, '$.f') AS
+  TEXT)`), and `setNull` adds an `AFTER UPDATE OF fk_<field>` trigger so the **record body** (not
+  only the hidden column) reads `null`. One mechanism for all three policies. Changing a pinned
+  relation after data exists rebuilds the table in place and refuses naming the resource if rows
+  would orphan (`StoreSchemaConflictError`).
+- **T027 — index use.** SQLite uses an expression index only when the query repeats the
+  expression, so a *declared* filterable/sortable property inlines its (quote-escaped) path as a
+  literal; every other property keeps slice 1's bound-path form, so a hostile property name still
+  cannot reach the SQL text.
+- **T023 — `removeByOrigin`/`wipe` and restrict.** Both now run in one transaction with
+  `defer_foreign_keys`, so a restrict link passes when parent and children go together.
+- **T022 — slice 1's `CountingStore` (large-collection test)** gained pure-delegation methods for
+  the additive seam so the typecheck stays green; its assertions are untouched.
