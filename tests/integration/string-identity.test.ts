@@ -77,3 +77,22 @@ describe("identity allocation satisfies the declared pattern (FR-011)", () => {
     }
   });
 });
+
+describe("F-E — an open-quantifier identity pattern never collides (UNIQUE 500 at create #11)", () => {
+  it("creates 120 records under ^W-[0-9]+$, all unique and matching, with NO unsupported-pattern ambiguity", async () => {
+    mock = await start({ spec: fixturePath("open-quantifier-api.yaml"), operations: ["createWidget", "getWidget"] });
+    expect(mock.report.ambiguities.filter((a) => a.kind === "identity-pattern-unsupported")).toEqual([]);
+    const ids: string[] = [];
+    for (let i = 0; i < 120; i += 1) {
+      const response = await fetch(`${mock.baseUrl}/widgets`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ label: `w${i}` }),
+      });
+      expect(response.status, `create #${i + 1}`).toBe(201);
+      ids.push(((await response.json()) as { id: string }).id);
+    }
+    expect(new Set(ids).size).toBe(120);
+    expect(ids.every((id) => /^W-[0-9]+$/.test(id))).toBe(true);
+  });
+});

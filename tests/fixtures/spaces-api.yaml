@@ -48,7 +48,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/BigInt"
+                "$ref": "#/components/schemas/BigIntInput"
               }
             }
           }
@@ -147,7 +147,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SmallInt"
+                "$ref": "#/components/schemas/SmallIntInput"
               }
             }
           }
@@ -246,7 +246,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UuidThing"
+                "$ref": "#/components/schemas/UuidThingInput"
               }
             }
           }
@@ -346,7 +346,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Formatted"
+                "$ref": "#/components/schemas/FormattedInput"
               }
             }
           }
@@ -446,7 +446,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Opaque"
+                "$ref": "#/components/schemas/OpaqueInput"
               }
             }
           }
@@ -580,6 +580,56 @@
           "id": {
             "type": "string"
           },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "BigIntInput": {
+        "title": "BigIntInput",
+        "type": "object",
+        "required": [],
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "SmallIntInput": {
+        "title": "SmallIntInput",
+        "type": "object",
+        "required": [],
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "UuidThingInput": {
+        "title": "UuidThingInput",
+        "type": "object",
+        "required": [],
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "FormattedInput": {
+        "title": "FormattedInput",
+        "type": "object",
+        "required": [],
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "OpaqueInput": {
+        "title": "OpaqueInput",
+        "type": "object",
+        "required": [],
+        "properties": {
           "name": {
             "type": "string"
           }

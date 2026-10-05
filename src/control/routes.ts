@@ -21,6 +21,8 @@ export interface ControlContext {
   resources: Resource[];
   /** `config.ids.generatedStart`: where a rewound counter starts again. */
   idsStart: number;
+  /** Per-collection API-identity start (an entity's own `generatedStart`, or a formatted range's start). */
+  idStarts?: Record<string, number>;
   /** The inlined contract text, served verbatim. */
   openapiBytes: string;
   /** Shut the running mock down. Idempotent. */
@@ -139,7 +141,10 @@ function wipe(ctx: ControlContext, scope: Resource[]): Record<string, number> {
     }
   }
 
-  for (const resource of scope) ctx.store.setMeta(`id_seq:${resource.name}`, String(ctx.idsStart));
+  for (const resource of scope) {
+    ctx.store.setMeta(`id_seq:${resource.name}`, String(ctx.idStarts?.[resource.name] ?? ctx.idsStart));
+    ctx.store.rewindRange(resource.name); // wipe + regenerate must allocate the same identities
+  }
   return removed;
 }
 

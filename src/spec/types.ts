@@ -189,6 +189,15 @@ export interface IndexReason {
   reason: string;
 }
 
+/** A collection's identity space and reserved range, as reported at startup (FR-017). */
+export interface IdentityReport {
+  resource: string;
+  space: IdSpaceKind;
+  declared: string;
+  reserved: string;
+  unreservable: boolean;
+}
+
 export interface StartupReport {
   spec: {
     source: string;
@@ -202,6 +211,8 @@ export interface StartupReport {
   /** The selected recipe, when one is. */
   recipe?: string;
   plan?: PlanSummary;
+  /** Per-collection identity space and reserved range. */
+  identity?: IdentityReport[];
   indexes: IndexReason[];
   /** Record counts per collection and origin, once the store is populated (FR-004). */
   origins?: Record<string, Partial<Record<"static" | "imported" | "generated" | "runtime", number>>>;

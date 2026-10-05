@@ -130,6 +130,15 @@ export function renderStartupReport(report: StartupReport): string {
     }
   }
 
+  if (report.identity && report.identity.length > 0) {
+    lines.push("");
+    lines.push("identity ranges (reserved per collection, kept disjoint from fixtures):");
+    for (const id of report.identity) {
+      const detail = id.unreservable ? "no range can be reserved in this space (reported, not guessed)" : `reserved ${id.reserved}`;
+      lines.push(`  ${id.resource}: ${id.space} — ${detail} [${id.declared}]`);
+    }
+  }
+
   if (report.indexes.length > 0) {
     lines.push("");
     lines.push("indexed because the document declares them filterable/sortable:");

@@ -300,6 +300,11 @@ export class SqliteStore implements Store {
     return rows.map(toRange);
   }
 
+  rewindRange(resource: string): void {
+    const range = this.readRange(resource);
+    if (range) this.advanceRange(resource, range.reserved.split("..")[0] ?? "");
+  }
+
   /** Rewind every cursor to its reserved start, so wipe + regenerate allocates the same identities. */
   #rewindRanges(): void {
     for (const range of this.listRanges()) {

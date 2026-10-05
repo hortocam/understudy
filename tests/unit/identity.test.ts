@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { allocateIdentity, identityRenderer, patternSupported } from "../../src/spec/identity.js";
+import { IdentitySpaceExhaustedError } from "../../src/errors.js";
 import type { Resource } from "../../src/spec/types.js";
 
 function resource(overrides: Partial<Resource>): Resource {
@@ -72,5 +73,57 @@ describe("identity allocation (FR-011)", () => {
     const thing = resource({ idType: "string", idPattern: "^W-[0-9]{6}$" });
     const values = new Set([100000, 100001, 100002].map((counter) => allocateIdentity(thing, counter)));
     expect(values.size).toBe(3);
+  });
+});
+
+
+describe("F-E — open quantifiers allocate unique, conforming identities (slice 1 deferral, owned here)", () => {
+  // Each pattern is allocated 1 000 consecutive identities from the default runtime start. The
+  // bounded generator used to map `+`, `*` and `{n,}` to exactly ONE unit, so `^W-[0-9]+$`
+  // produced W-0..W-9 and then repeated: a UNIQUE collision (a 500) at the eleventh create.
+  const PATTERNS = ["^W-[0-9]+$", "^W-[0-9]{3,}$", "^[A-Z]+-[0-9]*$", "^[0-9]+$", "^ID[0-9]{2,}X$"];
+
+  it.each(PATTERNS)("%s: 1 000 consecutive identities are unique and every one matches the declared pattern", (pattern) => {
+    const thing = resource({ idType: "string", idSpace: "formatted", idPattern: pattern });
+    expect(patternSupported(pattern)).toBe(true);
+    const ids = Array.from({ length: 1000 }, (_, i) => allocateIdentity(thing, 100000 + i));
+    expect(new Set(ids).size).toBe(1000);
+    const re = new RegExp(pattern);
+    expect(ids.filter((id) => !re.test(id))).toEqual([]);
+  });
+
+  it("an open numeric run grows with the counter instead of wrapping (and keeps its declared minimum width)", () => {
+    const widget = resource({ idType: "string", idSpace: "formatted", idPattern: "^W-[0-9]+$" });
+    expect(allocateIdentity(widget, 7)).toBe("W-7");
+    expect(allocateIdentity(widget, 100000)).toBe("W-100000");
+    expect(allocateIdentity(widget, 123456789)).toBe("W-123456789");
+    const gadget = resource({ idType: "string", idSpace: "formatted", idPattern: "^G-[0-9]{3,}$" });
+    expect(allocateIdentity(gadget, 7)).toBe("G-007");
+    expect(allocateIdentity(gadget, 12345)).toBe("G-12345");
+  });
+
+  it("with no digit run, the counter is carried by the letters (bijective growth), still unique and conforming", () => {
+    const thing = resource({ idType: "string", idSpace: "formatted", idPattern: "^[A-Z]+$" });
+    const ids = Array.from({ length: 1000 }, (_, i) => allocateIdentity(thing, i));
+    expect(new Set(ids).size).toBe(1000);
+    expect(ids.every((id) => /^[A-Z]+$/.test(id))).toBe(true);
+  });
+
+  it("a FIXED width that is exhausted refuses by name instead of wrapping into a collision (was: modulo wrap)", () => {
+    const thing = resource({ name: "Ticket", idType: "string", idSpace: "formatted", idPattern: "^T-[0-9]{3}$" });
+    expect(allocateIdentity(thing, 999)).toBe("T-999");
+    expect(() => allocateIdentity(thing, 1000)).toThrow(IdentitySpaceExhaustedError);
+    expect(() => allocateIdentity(thing, 1000)).toThrow(/Ticket/);
+  });
+
+  it("a bounded range {n,m} grows to m digits and then refuses", () => {
+    const thing = resource({ name: "Seat", idType: "string", idSpace: "formatted", idPattern: "^S[0-9]{1,2}$" });
+    expect(allocateIdentity(thing, 5)).toBe("S5");
+    expect(allocateIdentity(thing, 99)).toBe("S99");
+    expect(() => allocateIdentity(thing, 100)).toThrow(IdentitySpaceExhaustedError);
+  });
+
+  it("constructs the generator still cannot satisfy are reported as unsupported (and fall back), never emitted non-conforming", () => {
+    for (const pattern of ["^(a|b)\\d$", "^(?=.*A)[A-Z]{4}$", "^\\1[0-9]$"]) expect(patternSupported(pattern)).toBe(false);
   });
 });

@@ -477,7 +477,7 @@ a pure, reproducible function — before any row is written.
 
 **Goal**: reserved ranges across integer / uuid / formatted / opaque spaces (FR-017/018).
 
-- [ ] T060 [P] [US6] **F-E regression, first** (slice 1 deferred; this slice owns it). Test in
+- [X] T060 [P] [US6] **F-E regression, first** (slice 1 deferred; this slice owns it). Test in
       `tests/unit/identity.test.ts` (extend; slice 1's cases untouched) and
       `tests/integration/string-identity.test.ts`: for `^W-[0-9]+$`, `^W-[0-9]{3,}$`,
       `^[A-Z]+-[0-9]*$` allocate **1 000 consecutive identities**: all **unique**, all match the
@@ -486,14 +486,14 @@ a pure, reproducible function — before any row is written.
       is reported as `identity-pattern-unsupported` and falls back, never non-conforming.
       **Red on a real assertion today**: `W-0…W-9` then `UNIQUE` collision at #11. Fixture
       `tests/fixtures/open-quantifier-api.yaml`.
-- [ ] T061 [US6] Fix `src/spec/identity.ts`: an **open quantifier** (`+`, `*`, `{n,}`) on a digit
+- [X] T061 [US6] Fix `src/spec/identity.ts`: an **open quantifier** (`+`, `*`, `{n,}`) on a digit
       run renders the counter **unpadded and growing** (`{n,}` zero-pads to `n` then grows); on a
       letter run it renders a bijective base-N numeral that grows; fixed quantifiers keep the
       current bounded behaviour **with the wrap replaced by a refusal** (`IdentitySpaceExhausted`,
       named, reported) instead of silently wrapping into a collision. Output is verified against
       the declared pattern before use (existing rule). Remove the "maps open quantifiers to one
       unit" comment.
-- [ ] T062 [P] [US6] Tests in `tests/unit/identity-ranges.test.ts` (FR-017/018, SC-006), one
+- [X] T062 [P] [US6] Tests in `tests/unit/identity-ranges.test.ts` (FR-017/018, SC-006), one
       block per space: **integer** (disjoint from fixtures: a fixture id ≥ the collection's
       range start refuses naming the collection; `generatedStart` per entity and global);
       **uuid** (generated v4-shaped from the collection stream; a draw equal to a fixture or
@@ -504,16 +504,16 @@ a pure, reproducible function — before any row is written.
       allocation (FR-018)**: API-created records continue from the **same** `_id_ranges` cursor
       so they can collide with neither fixture nor generated ids — create 200 via the API after
       generating 500; assert the union is duplicate-free in every space. Fails first.
-- [ ] T063 [US6] Implement `src/data/identity.ts` and wire the slice-1 allocator
+- [X] T063 [US6] Implement `src/data/identity.ts` and wire the slice-1 allocator
       (`nextIdentity`/`src/mock/crud.ts` allocation) to consult it **without changing CRUD
       semantics** — a delegation behind the existing `ids` option, covered by slice 1's
       untouched suites staying green.
-- [ ] T064 [P] [US6] Integration test `tests/integration/identity-collision.test.ts` (US6.1–6.4,
+- [X] T064 [P] [US6] Integration test `tests/integration/identity-collision.test.ts` (US6.1–6.4,
       Scenario 4): fixtures + generation in one collection ⇒ `uniq -d` over every identity is
       empty; overlapping configured ranges **refuse to start naming the collection** (assert the
       message, not a stack trace); same seed twice ⇒ same identities for the same records; a
       string-identity collection produces identities in the declared form. Fails first.
-- [ ] T065 [US6] Make T062/T064 green.
+- [X] T065 [US6] Make T062/T064 green.
 
 **Checkpoint**: no identity collides in any space, in 100% of the tested configurations (SC-006);
 F-E is closed.
@@ -853,3 +853,20 @@ nowhere.
   can satisfy (a lookahead) refuses naming the field. An RFC 3339 `time` needs a zone (`…Z`).
 - **T052 — expressions.** `$now()`/`$millis()` are overridden to the clock seam's instant; an
   expression that yields nothing (a missing sibling) is an error, never a silently dropped field.
+- **T060/T061 — F-E closed.** Red evidence: against the slice-1 allocator the integration test
+  fails at `create #11: expected 500 to be 201` (the `UNIQUE` collision at W-0…W-9 + 1), and the
+  1 000-identity unit cases fail on duplicates. Fix: pattern runs carry `{min, max}`; an open run
+  grows with the counter and keeps its minimum width; the counter is carried by the digit runs, or by
+  the letter runs (base 26) when there is no digit run; a fixed run that is out of room throws
+  `IdentitySpaceExhaustedError` instead of wrapping modulo its width. `patternSupported` now probes
+  with small counters (a `{3}` run is supported) and requires distinct values.
+- **T063 — runtime allocation (D3).** `id_seq:<resource>` stays the API counter (rewound by
+  `wipe`); the API path now skips any identity the table already holds, whatever its origin, so
+  it cannot reissue a fixture or generated identity. A `format: uuid` identity gets a deterministic
+  v4-shaped uuid of the counter (slice 1 would have issued a base-36 string that violates the
+  declared format). `_id_ranges` holds the reserved span, space and generation cursor; a scoped
+  `reset` rewinds it too (`Store.rewindRange`).
+- **T064 — generation half.** The generation-dependent assertions of US6.1/6.3 (no generated
+  identity equals a fixture identity; same seed ⇒ same identities) are asserted in
+  `tests/integration/generate-*.test.ts` and `determinism.test.ts` (Phases 8 and 10), which is
+  where generation exists.

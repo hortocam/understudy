@@ -48,7 +48,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CursorThing"
+                "$ref": "#/components/schemas/CursorThingInput"
               }
             }
           }
@@ -147,7 +147,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/OffsetThing"
+                "$ref": "#/components/schemas/OffsetThingInput"
               }
             }
           }
@@ -246,7 +246,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PageThing"
+                "$ref": "#/components/schemas/PageThingInput"
               }
             }
           }
@@ -330,7 +330,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PlainThing"
+                "$ref": "#/components/schemas/PlainThingInput"
               }
             }
           }
@@ -446,6 +446,46 @@
           "id": {
             "type": "integer"
           },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "CursorThingInput": {
+        "title": "CursorThingInput",
+        "type": "object",
+        "required": [],
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "OffsetThingInput": {
+        "title": "OffsetThingInput",
+        "type": "object",
+        "required": [],
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "PageThingInput": {
+        "title": "PageThingInput",
+        "type": "object",
+        "required": [],
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "PlainThingInput": {
+        "title": "PlainThingInput",
+        "type": "object",
+        "required": [],
+        "properties": {
           "name": {
             "type": "string"
           }

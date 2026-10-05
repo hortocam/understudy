@@ -147,6 +147,8 @@ export interface Store {
   readRange(resource: string): IdRange | undefined;
   advanceRange(resource: string, next: string): void;
   listRanges(): IdRange[];
+  /** Rewind one collection's cursor to the start of its reserved span (a scoped reset, FR-014). */
+  rewindRange(resource: string): void;
   list(resource: string): StoredRecord[];
   /**
    * A filtered, sorted and paged read, executed by the store so a page never loads the

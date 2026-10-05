@@ -27,6 +27,7 @@ import { ConfigRefusedError, type Refusal } from "./errors.js";
 import { createClock } from "./clock.js";
 import { buildGenerationPlan } from "./data/plan.js";
 import { applyFixtures } from "./data/fixtures.js";
+import { planIdentity, type IdentityPlan } from "./data/identity.js";
 import { indexReasons } from "./spec/report.js";
 import { effectiveSeed } from "./config/load.js";
 import { reconcile } from "./config/reconcile.js";
@@ -125,6 +126,29 @@ export async function createMock(
     // every refusal it can already see. Nothing is written yet.
     const plan = buildGenerationPlan({ model, ...(recipe ? { recipe } : {}), entities: config.entities });
     refusals.push(...plan.refusals);
+
+    // 3d. Identity spaces and reserved ranges (FR-017): per collection, in the space its identity
+    // field declares, kept disjoint from the fixtures. Overlap refuses naming the collection.
+    const fixtureIds = new Map<string, string[]>();
+    for (const table of [...fixtures.lookups, ...fixtures.entities]) {
+      const resource = model.resources.find((r) => r.name === table.entity);
+      if (!resource) continue;
+      const field = table.idField ?? resource.idField;
+      fixtureIds.set(table.entity, [...(fixtureIds.get(table.entity) ?? []), ...table.rows.map((row) => String(row[field]))]);
+    }
+    const identityPlans = new Map<string, IdentityPlan>();
+    for (const resource of model.resources) {
+      const planned = planIdentity({
+        resource,
+        entity: config.entities[resource.name],
+        globalStart: config.ids.generatedStart,
+        fixtureIds: fixtureIds.get(resource.name) ?? [],
+      });
+      identityPlans.set(resource.name, planned.plan);
+      for (const refusal of planned.refusals) {
+        if (!refusals.some((r) => r.file === refusal.file && r.key === refusal.key)) refusals.push(refusal);
+      }
+    }
     if (refusals.length > 0) throw new ConfigRefusedError(refusals);
     const clock = createClock(config.clock);
     const seed = effectiveSeed(config, recipe);
@@ -139,6 +163,10 @@ export async function createMock(
       clock,
       seed,
       plan,
+      identity: model.resources.map((r) => {
+        const p = identityPlans.get(r.name) as IdentityPlan;
+        return { resource: r.name, space: p.space, declared: p.declared, reserved: p.reserved, unreservable: p.unreservable };
+      }),
       ...(recipe ? { recipe: recipe.name } : {}),
     });
 
@@ -156,6 +184,22 @@ export async function createMock(
       });
     }
     store.setMeta("spec_hash", spec.contentHash);
+    // Reserve each collection's range. A range that is unchanged keeps its cursor across restarts;
+    // a changed one starts again at its own start.
+    for (const resource of model.resources) {
+      const p = identityPlans.get(resource.name) as IdentityPlan;
+      const existing = store.readRange(resource.name);
+      const keep = existing !== undefined && existing.idSpace === p.space && existing.reserved === p.reserved ? existing.next : undefined;
+      store.reserveRange({
+        resource: resource.name,
+        idSpace: p.space,
+        declared: p.declared,
+        reserved: p.reserved,
+        ...(p.space === "uuid" ? {} : { next: keep ?? String(p.start) }),
+      });
+    }
+    const idStarts: Record<string, number> = {};
+    for (const [name, p] of identityPlans) if (p.space === "integer" || p.space === "formatted") idStarts[name] = p.start;
     store.setMeta("seed", String(seed));
     store.setMeta("clock_mode", clock.mode);
 
@@ -186,7 +230,7 @@ export async function createMock(
       document: spec.document,
       model,
       live: selection.live,
-      crud: { store, ids: config.ids },
+      crud: { store, ids: config.ids, idStarts },
       basePath: config.server.basePath,
       recordRequest: (entry) => store.appendRequest(entry),
     });
@@ -205,6 +249,7 @@ export async function createMock(
       notImplemented: report.notSelected,
       resources: model.resources,
       idsStart: config.ids.generatedStart,
+      idStarts,
       openapiBytes: controlApiBytes,
       onTeardown: () => {
         close().catch((error: unknown) => {

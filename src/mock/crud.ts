@@ -13,6 +13,8 @@ import { allocateIdentity } from "../spec/identity.js";
 export interface CrudContext {
   store: Store;
   ids: IdsConfig;
+  /** Per-collection start of the API-written identity range (`entities.<X>.ids.generatedStart`, or the formatted range's start). */
+  idStarts?: Record<string, number>;
 }
 
 /** The declared update style of the operation being served (FR-006). */
@@ -49,8 +51,13 @@ export function createRecord(
 ): Record<string, unknown> {
   // FR-011 / data-model.md §"Identity allocation": the counter is the reserved space; how it
   // is *presented* follows the declared identity type and pattern.
-  const counter = context.store.nextIdentity(resource.name, context.ids.generatedStart);
-  const identity = allocateIdentity(resource, counter);
+  // An API-written identity must collide with neither a fixture nor a generated one (FR-018):
+  // the counter skips any identity the table already holds, whatever its origin.
+  const start = context.idStarts?.[resource.name] ?? context.ids.generatedStart;
+  let identity: string;
+  do {
+    identity = allocateIdentity(resource, context.store.nextIdentity(resource.name, start));
+  } while (context.store.readOne(resource.name, identity) !== undefined);
   const data = { ...asObject(body), [resource.idField]: typedIdentity(resource, identity) };
   const record = context.store.insert(resource.name, identity, data, "runtime");
   return present(resource, record);

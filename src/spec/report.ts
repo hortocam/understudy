@@ -10,6 +10,7 @@ import type { Clock } from "../clock.js";
 import type {
   Ambiguity,
   DerivedModel,
+  IdentityReport,
   IndexReason,
   PlanSummary,
   DocumentOperation,
@@ -37,6 +38,7 @@ export interface BuildReportInput {
   seed?: number;
   recipe?: string;
   plan?: PlanSummary;
+  identity?: IdentityReport[];
   origins?: StartupReport["origins"];
 }
 
@@ -98,6 +100,7 @@ export function buildStartupReport(input: BuildReportInput): StartupReport {
     ...(input.seed !== undefined ? { seed: input.seed } : {}),
     ...(input.recipe !== undefined ? { recipe: input.recipe } : {}),
     ...(input.plan !== undefined ? { plan: input.plan } : {}),
+    ...(input.identity !== undefined ? { identity: input.identity } : {}),
     ...(input.origins !== undefined ? { origins: input.origins } : {}),
     indexes: indexReasons(input.model),
     live: input.live.map(operationRef),

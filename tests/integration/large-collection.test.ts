@@ -107,6 +107,9 @@ class CountingStore implements Store {
   listRanges(): IdRange[] {
     return this.inner.listRanges();
   }
+  rewindRange(resource: string): void {
+    this.inner.rewindRange(resource);
+  }
 
   insert(resource: string, identity: string, data: unknown, origin?: Origin): StoredRecord {
     return this.inner.insert(resource, identity, data, origin);
