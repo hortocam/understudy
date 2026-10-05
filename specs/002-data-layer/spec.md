@@ -228,12 +228,14 @@ falls to the next rule in the documented order; repeat down the chain and confir
 - **FR-002**: Fixture configuration (fixed records and lookup tables) MUST be applied identically
   on every run and MUST NEVER be modified by generation, import, or activity over the mocked API.
   Fixture configuration MUST be selected against the same operation-selection grammar the core
-  slice delivers: an operation is named by `operationId` when the document declares one, otherwise
-  by `METHOD /path`, and tag selectors MUST be accepted, including tag names containing a space
-  (`Market Orders` — normalised to `Market_Orders` in configuration, with the raw form also
-  accepted and an ambiguity refused by name). Against the measured target document, **0 of 224
-  operations declare an `operationId`**, so `METHOD /path` is the only universal selector and tags
-  are the ergonomic one; fixture configuration MUST NOT assume `operationId` is available.
+  slice delivers: **`METHOD /path`, `operationId` and a tag selector are three peers with no
+  precedence** — a document may support any one of them as its only workable form, so none is a
+  fallback for another. Tag names containing a space MUST be accepted (`Market Orders` —
+  normalised to `Market_Orders` in configuration, with the raw form also accepted, and an
+  ambiguous collapse refused by name). Against the measured target document, **0 of 224 operations
+  declare an `operationId`**, so `METHOD /path` alone is not enough to select a useful surface and
+  tag selectors are the ergonomic form; fixture configuration MUST NOT assume `operationId` is
+  available.
 - **FR-003**: Generation configuration MUST be selectable by name ("recipe") so that several
   datasets (a small one for continuous integration, a large one for load) can coexist in one
   project and be chosen at start.

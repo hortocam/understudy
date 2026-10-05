@@ -17,8 +17,8 @@
       "description": "The operations to make live. Everything else answers 501. Empty or unknown entries refuse to start. An operation may be named by 'METHOD /path', by operationId, or by tag (a tag containing a space is written with '_').",
       "items": {
         "type": "string",
-        "pattern": "^(GET|PUT|POST|DELETE|PATCH|HEAD|OPTIONS)\\s+/.+$|^[A-Za-z_][A-Za-z0-9_]*$",
-        "description": "Either 'METHOD /path', an operationId, or a tag name. All three are peers: a document may support only one of them (the measured target has 0 operationIds), so none is a fallback.",
+        "minLength": 1,
+        "description": "Either 'METHOD /path', an operationId, or a tag name. All three are peers with no precedence: a document may support only one of them (the measured target has 0 operationIds, so tag selectors are the ergonomic answer there), so none is a fallback. An operationId is NOT constrained to an identifier shape \u2014 OpenAPI only requires it to be a unique string, and real documents use hyphens and dots (e.g. 'get-widgets', 'api.getWidgets'); a tag containing a space is written with '_' ('Market Orders' -> 'Market_Orders'), with the raw form also accepted and an ambiguous collapse refused by name. A genuinely unknown entry is refused at startup by name, not by this pattern.",
         "examples": ["POST /inventory", "getInventoryById", "Inventory", "Market_Orders"]
       }
     },
@@ -142,7 +142,7 @@
     "signing": {
       "type": "object",
       "additionalProperties": false,
-      "description": "RESERVED — accepted by the schema so the shape is stable, but not read in this slice. Webhook HMAC signing lands with the webhook slices; algorithm, header name and signed-content template will all be configurable. Setting it has no effect yet.",
+      "description": "RESERVED — accepted by the schema so the shape is stable, but not read in this slice, and selecting it is a STARTUP REFUSAL naming the key (it is never a silent no-op: a config key that quietly does nothing is worse than one that does not exist). Webhook HMAC signing lands with the webhook slices; algorithm, header name and signed-content template will all be configurable.",
       "properties": {
         "alg": { "type": "string", "default": "hmac-sha256" },
         "header": { "type": "string", "default": "X-Signature" }
