@@ -6,6 +6,7 @@
  * plane stopped, every command must exit non-zero with a connection error rather than fall
  * back to doing the work locally (contracts/cli.md, "Connection behaviour").
  */
+import { writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -14,10 +15,19 @@ import type { RunningMock } from "../../src/index.js";
 import { INVENTORY_OPERATIONS, fixturePath, newStoreDir, start, storePath } from "../helpers/mock.js";
 
 let mock: RunningMock | undefined;
+/** Control URLs of mocks started via `up`, torn down after each test even if it throws. */
+const upMocks: string[] = [];
 
 afterEach(async () => {
   await mock?.close();
   mock = undefined;
+  for (const url of upMocks.splice(0)) {
+    try {
+      await cli(["down", "--control-url", url]);
+    } catch {
+      // Already torn down by the test: cleanup is best-effort.
+    }
+  }
 });
 
 interface Result {
@@ -179,21 +189,23 @@ describe("down mirrors POST /teardown", () => {
 });
 
 describe("up is the one command that starts a server", () => {
-  it("builds the mock from the config, prints the report then a ready line, and stops on down", async () => {
-    const dir = newStoreDir();
-    const configPath = join(dir, "understudy.yaml");
-    const { writeFileSync } = await import("node:fs");
-    writeFileSync(
-      configPath,
-      [
-        `spec: ${fixturePath("inventory-api.yaml")}`,
-        "operations:",
-        ...INVENTORY_OPERATIONS.map((entry) => `  - ${entry}`),
-        `storage: { driver: sqlite, path: ${JSON.stringify(storePath(dir))} }`,
-      ].join("\n"),
-    );
+  interface UpResult {
+    stdout: string;
+    stderr: string;
+    /** Present once `up` prints its `ready:` line; undefined if it exited first. */
+    controlUrl: string | undefined;
+    exit: Promise<number>;
+  }
 
+  /**
+   * Run `up` in-process and wait for its `ready:` line, so the new-selection tests can
+   * assert against a real running mock. If `up` exits before becoming ready (e.g. it
+   * rejected the arguments), the promise still resolves — with `controlUrl` undefined —
+   * so the caller fails on its own assertion instead of hanging.
+   */
+  async function upStarted(args: string[], env: Record<string, string> = {}): Promise<UpResult> {
     let stdout = "";
+    let stderr = "";
     let announce: (url: string) => void = () => {};
     const ready = new Promise<string>((resolve) => (announce = resolve));
     const io: CliIo = {
@@ -202,17 +214,42 @@ describe("up is the one command that starts a server", () => {
         const match = /ready: control plane at (\S+)/.exec(text);
         if (match?.[1]) announce(match[1]);
       },
-      err: () => {},
-      env: {},
+      err: (text) => (stderr += `${text}\n`),
+      env,
     };
-    const exit = runCli(["node", "ustdy", "up", "--config", configPath, "--port", "0"], io);
-    const controlUrl = await ready;
+    const exit = runCli(["node", "ustdy", ...args], io);
+    const controlUrl = await Promise.race([ready, exit.then(() => undefined)]);
+    if (controlUrl) upMocks.push(controlUrl);
+    return { stdout, stderr, controlUrl, exit };
+  }
+
+  /** A config file selecting exactly `operations`. */
+  function writeConfig(operations: readonly string[]): string {
+    const dir = newStoreDir();
+    const configPath = join(dir, "understudy.yaml");
+    writeFileSync(
+      configPath,
+      [
+        `spec: ${fixturePath("inventory-api.yaml")}`,
+        "operations:",
+        ...operations.map((entry) => `  - ${entry}`),
+        `storage: { driver: sqlite, path: ${JSON.stringify(storePath(dir))} }`,
+      ].join("\n"),
+    );
+    return configPath;
+  }
+
+  it("builds the mock from the config, prints the report then a ready line, and stops on down", async () => {
+    const configPath = writeConfig(INVENTORY_OPERATIONS);
+
+    const { stdout, controlUrl, exit } = await upStarted(["up", "--config", configPath, "--port", "0"]);
 
     expect(stdout).toContain("live operations (5)");
     expect(stdout.indexOf("live operations")).toBeLessThan(stdout.indexOf("ready:"));
+    expect(controlUrl).toBeDefined();
     expect((await json(`${controlUrl}/health`)).status).toBe("ok");
 
-    const down = await cli(["down", "--control-url", controlUrl]);
+    const down = await cli(["down", "--control-url", controlUrl as string]);
     expect(down.code).toBe(0);
     expect(await exit).toBe(0);
   });
@@ -221,6 +258,92 @@ describe("up is the one command that starts a server", () => {
     const result = await cli(["up", "--config", join(newStoreDir(), "missing.yaml")]);
     expect(result.code).not.toBe(0);
     expect(result.stderr).toContain("missing.yaml");
+  });
+
+  /**
+   * FR-020: the operation selection may be given at start as arguments or environment, and
+   * an explicit selection overrides the config file's `operations` (contracts/cli.md).
+   */
+  describe("FR-020 operation selection at start", () => {
+    /** The `METHOD /path` set the startup report lists as live. */
+    function liveSet(stdout: string): string[] {
+      const lines = stdout.split("\n");
+      const start = lines.findIndex((line) => line.startsWith("live operations ("));
+      const live: string[] = [];
+      for (let i = start + 1; i < lines.length && !/^\s*$/.test(lines[i] ?? ""); i += 1) {
+        live.push((lines[i] ?? "").trim());
+      }
+      return live;
+    }
+
+    const TWO_LIVE = ["GET /inventory (listInventory)", "POST /inventory (createInventory)"];
+
+    it("--operation (repeatable) selects exactly those operations and overrides the config", async () => {
+      // The config selects all five; the flag selects two, so the two must win.
+      const configPath = writeConfig(INVENTORY_OPERATIONS);
+      const { stdout, controlUrl } = await upStarted([
+        "up",
+        "--config",
+        configPath,
+        "--port",
+        "0",
+        "--operation",
+        "GET /inventory",
+        "--operation",
+        "POST /inventory",
+      ]);
+
+      // Exactly the two named are live, and the rest answer NOT_IMPLEMENTED.
+      expect(liveSet(stdout)).toEqual(TWO_LIVE);
+      // The fixture declares six operations; the two selected leave four unselected.
+      expect(stdout).toContain("not selected (4)");
+
+      expect(controlUrl).toBeDefined();
+      const baseUrl = (controlUrl ?? "").replace(/\/__understudy$/, "");
+      const unselected = await fetch(`${baseUrl}/events`);
+      expect(unselected.status).toBe(501);
+      expect(((await unselected.json()) as { error: string }).error).toBe("not_implemented");
+
+      // A selected operation answers as a live one, not 501.
+      const selected = await fetch(`${baseUrl}/inventory`);
+      expect(selected.status).toBe(200);
+    });
+
+    it("USTDY_OPERATIONS (comma-separated) does the same", async () => {
+      const configPath = writeConfig(INVENTORY_OPERATIONS);
+      const { stdout } = await upStarted(["up", "--config", configPath, "--port", "0"], {
+        USTDY_OPERATIONS: "GET /inventory,POST /inventory",
+      });
+      expect(liveSet(stdout)).toEqual(TWO_LIVE);
+    });
+
+    it("USTDY_OPERATIONS (newline-separated) does the same", async () => {
+      const configPath = writeConfig(INVENTORY_OPERATIONS);
+      const { stdout } = await upStarted(["up", "--config", configPath, "--port", "0"], {
+        USTDY_OPERATIONS: "GET /inventory\nPOST /inventory",
+      });
+      expect(liveSet(stdout)).toEqual(TWO_LIVE);
+    });
+
+    it("accepts an operationId entry as well as METHOD /path (FR-002 peer forms)", async () => {
+      const configPath = writeConfig(INVENTORY_OPERATIONS);
+      const { stdout } = await upStarted(["up", "--config", configPath, "--port", "0", "--operation", "listInventory"]);
+      expect(liveSet(stdout)).toEqual(["GET /inventory (listInventory)"]);
+    });
+
+    it("uses the config file's selection when neither flag nor env is given (regression guard)", async () => {
+      const configPath = writeConfig(["GET /inventory", "POST /inventory"]);
+      const { stdout } = await upStarted(["up", "--config", configPath, "--port", "0"]);
+      expect(liveSet(stdout)).toEqual(TWO_LIVE);
+    });
+
+    it("refuses an unknown entry by name at startup, rather than blindly overriding", async () => {
+      const configPath = writeConfig(INVENTORY_OPERATIONS);
+      const result = await cli(["up", "--config", configPath, "--port", "0", "--operation", "GET /nope"], {});
+      expect(result.code).not.toBe(0);
+      expect(result.stderr).toContain("GET /nope");
+      expect(result.stderr).toContain("the operation selection names an operation the document does not contain");
+    });
   });
 });
 

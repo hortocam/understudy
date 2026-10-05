@@ -68,6 +68,34 @@ function collect(value: string, previous: string[]): string[] {
   return [...previous, value];
 }
 
+/**
+ * Parse `USTDY_OPERATIONS` (FR-020): entries separated by commas or newlines, surrounding
+ * whitespace trimmed, empty entries dropped. An entry keeps its internal spelling — a
+ * `METHOD /path` entry's single space is significant and is *not* collapsed here.
+ */
+function parseOperationsEnv(raw: string): string[] {
+  return raw
+    .split(/[,\n]/)
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+}
+
+/**
+ * The operation selection for `up` (FR-020, contracts/cli.md): an explicit `--operation`
+ * (repeatable), else `USTDY_OPERATIONS`, else the loaded config's own `operations`. An
+ * explicit selection **overrides** the config file's; when neither is given the config's
+ * stands. Resolution and validation stay engine-side — this only composes the config.
+ */
+function resolveSelection(
+  options: { operation: string[] },
+  env: Record<string, string | undefined>,
+  config: UnderstudyConfig,
+): string[] {
+  if (options.operation.length > 0) return options.operation;
+  if (env.USTDY_OPERATIONS !== undefined) return parseOperationsEnv(env.USTDY_OPERATIONS);
+  return config.operations;
+}
+
 function formatLogEntry(entry: RequestLogEntry): string {
   const kind = entry.live ? "live" : "not-implemented";
   return `${entry.at}  ${entry.status}  ${entry.method} ${entry.path}  ${kind}  ${entry.durationMs}ms`;
@@ -107,6 +135,7 @@ export function buildProgram(io: CliIo): Command {
         "Environment:",
         "  USTDY_CONFIG       config file path (default: ./understudy.yaml)",
         "  USTDY_CONTROL_URL  control plane base URL, e.g. http://127.0.0.1:8080/__understudy",
+        "  USTDY_OPERATIONS   operations to make live for `up`, comma- or newline-separated",
         "",
         "Every command except `up` is a client of the running mock's control plane.",
       ].join("\n"),
@@ -128,37 +157,54 @@ export function buildProgram(io: CliIo): Command {
     .option("--port <n>", "port for the mocked surface (overrides server.port)", parsePort)
     .option("--control-port <n>", "separate port for the control plane (overrides control.port)", parsePort)
     .option("--control-url <url>", "control plane base URL to poll for readiness")
-    .action(async (options: { config?: string; port?: number; controlPort?: number; controlUrl?: string }) => {
-      const configPath = options.config ?? io.env.USTDY_CONFIG ?? DEFAULT_CONFIG;
-      let config: UnderstudyConfig;
-      try {
-        config = loadConfig(configPath);
-      } catch (error) {
-        throw new ControlRequestError(0, renderRefusal(error));
-      }
-      if (options.controlPort !== undefined) config = { ...config, control: { ...config.control, port: options.controlPort } };
+    .option(
+      "--operation <entry>",
+      "operation to make live, as `METHOD /path` or `operationId` (repeatable; default: the config's operations, or USTDY_OPERATIONS)",
+      collect,
+      [] as string[],
+    )
+    .action(
+      async (options: {
+        config?: string;
+        port?: number;
+        controlPort?: number;
+        controlUrl?: string;
+        operation: string[];
+      }) => {
+        const configPath = options.config ?? io.env.USTDY_CONFIG ?? DEFAULT_CONFIG;
+        let config: UnderstudyConfig;
+        try {
+          config = loadConfig(configPath);
+        } catch (error) {
+          throw new ControlRequestError(0, renderRefusal(error));
+        }
+        if (options.controlPort !== undefined) config = { ...config, control: { ...config.control, port: options.controlPort } };
+        // FR-020: fold the start-time selection into the config createMock sees, so an
+        // explicit choice overrides the file's `operations` without any engine-side change.
+        config = { ...config, operations: resolveSelection(options, io.env, config) };
 
-      let mock;
-      try {
-        mock = await createMock(config, {
-          ...(options.port !== undefined ? { port: options.port } : {}),
-          out: io.out,
-        });
-      } catch (error) {
-        // createMock has already printed the refusal; only the exit status remains.
-        throw new ControlRequestError(0, error instanceof Error ? error.message : String(error));
-      }
+        let mock;
+        try {
+          mock = await createMock(config, {
+            ...(options.port !== undefined ? { port: options.port } : {}),
+            out: io.out,
+          });
+        } catch (error) {
+          // createMock has already printed the refusal; only the exit status remains.
+          throw new ControlRequestError(0, error instanceof Error ? error.message : String(error));
+        }
 
-      const client = new ControlClient(options.controlUrl ?? `${mock.controlUrl}${mock.controlPrefix}`);
-      await waitForHealth(client);
-      io.out(`ready: control plane at ${client.baseUrl}  mock at ${mock.baseUrl}`);
-      const stop = (): void => void mock.close();
-      process.once("SIGINT", stop);
-      process.once("SIGTERM", stop);
-      await mock.closed;
-      process.off("SIGINT", stop);
-      process.off("SIGTERM", stop);
-    });
+        const client = new ControlClient(options.controlUrl ?? `${mock.controlUrl}${mock.controlPrefix}`);
+        await waitForHealth(client);
+        io.out(`ready: control plane at ${client.baseUrl}  mock at ${mock.baseUrl}`);
+        const stop = (): void => void mock.close();
+        process.once("SIGINT", stop);
+        process.once("SIGTERM", stop);
+        await mock.closed;
+        process.off("SIGINT", stop);
+        process.off("SIGTERM", stop);
+      },
+    );
 
   clientCommand("down", "tear the running mock down and wait until its port is released").action(
     async (options: { config?: string; controlUrl?: string }) => {
