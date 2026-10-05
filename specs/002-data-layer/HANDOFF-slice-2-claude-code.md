@@ -204,18 +204,29 @@ explicit about the following, so you do not have to re-derive them:
 
 ---
 
-## 6. Finish: two pull requests, not one
+## 6. Finish: one pull request for the whole slice
 
-`tasks.md` is a human checkpoint, so land it first. A long run with one early decision point beats a
-long run that guesses.
+`tasks.md` is a human checkpoint and it is **already generated and open as PR #1** — do not create it
+again. The owner reviews and **resolves the D1–D10 decisions table at that checkpoint**; implement
+against `tasks.md` only once it is approved.
 
 1. **PR 1 — the task list only.** `specs/002-data-layer/tasks.md`, nothing else. Title
    `docs(slice-2): tasks.md for the data-layer slice`. **Wait for approval.** You may keep working in
    the worktree meanwhile if it is useful, but do not implement against an unapproved task list.
-2. **PR 2 — the implementation**, once PR 1 is approved. Title
+2. **PR 2 — the whole implementation, one PR for the slice** (see `tasks.md` → "Delivery"). Title
    `feat(slice-2): data layer — config layers, derivation, generation, determinism`. Body: the gate
    output, red-before-green per test task, the recorded `quickstart.md` run, and the two carried
    follow-ups (F-E, T043 seam) named as done.
+
+   **This deviates from `CLAUDE.md` → "One phase per change", deliberately and for this slice only.**
+   The rule exists to keep a reviewer *and a coordinator* in the loop between phases; here the slice
+   is driven end to end by a single cloud agent (you) against a granted credit allocation, with **no
+   second orchestrator** to review between phases. Splitting into 11 PRs would make you idle at each
+   one waiting for a review nobody is staffing during the run — sacrificing throughput, not rigour.
+   What replaces the per-phase gate: **self-review at every phase Checkpoint** (`tasks.md`: the
+   phase's tests green **and** its `NC:` negative control **and** the `quickstart`-relevant scenario),
+   fixed in-run before the next phase starts. `main` stays fully protected and **the whole-slice PR
+   is reviewed and merged through the normal Kanban process afterwards**; you still merge nothing.
 
 ```bash
 git push -u origin wt/slice-2-data-layer
@@ -224,7 +235,7 @@ gh pr create --base main --head wt/slice-2-data-layer --title ... --body ...
 
 ---
 
-## 7. Evidence floor (both PRs)
+## 7. Evidence floor (this PR + the slice PR)
 
 Paste **real output**, not a claim:
 
