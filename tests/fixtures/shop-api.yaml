@@ -887,9 +887,7 @@
       "VenueInput": {
         "title": "VenueInput",
         "type": "object",
-        "required": [
-          "name"
-        ],
+        "required": [],
         "properties": {
           "name": {
             "type": "string",
@@ -916,10 +914,7 @@
       "EventInput": {
         "title": "EventInput",
         "type": "object",
-        "required": [
-          "name",
-          "venueId"
-        ],
+        "required": [],
         "properties": {
           "name": {
             "type": "string",
@@ -950,10 +945,7 @@
       "InventoryInput": {
         "title": "InventoryInput",
         "type": "object",
-        "required": [
-          "eventId",
-          "quantity"
-        ],
+        "required": [],
         "properties": {
           "eventId": {
             "type": "integer"
@@ -993,9 +985,7 @@
       "InventoryStatusInput": {
         "title": "InventoryStatusInput",
         "type": "object",
-        "required": [
-          "code"
-        ],
+        "required": [],
         "properties": {
           "code": {
             "type": "string"
@@ -1006,9 +996,7 @@
       "AuditNoteInput": {
         "title": "AuditNoteInput",
         "type": "object",
-        "required": [
-          "text"
-        ],
+        "required": [],
         "properties": {
           "text": {
             "type": "string"

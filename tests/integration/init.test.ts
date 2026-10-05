@@ -75,7 +75,7 @@ describe("ustdy init (FR-020)", () => {
     await cli(["init", "--spec", fixturePath("shop-api.yaml"), "--dir", dir]);
     expect(readdirSync(join(dir, "dynamic")).some((f) => f.endsWith(".yaml"))).toBe(true);
     const config = parseConfig(readFileSync(join(dir, "understudy.yaml"), "utf8"), join(dir, "understudy.yaml"));
-    const mock = await createMock({ ...config, recipe: "starter" }, { port: 0, out: () => {}, logger: createLogger({ write: () => {} }) });
+    const mock = await createMock({ ...config, recipe: "starter", storage: { ...config.storage, path: join(dir, "state.db") } }, { port: 0, out: () => {}, logger: createLogger({ write: () => {} }) });
     mocks.push(mock);
     const counts = mock.store.countByOrigin();
     expect(counts.Venue?.generated).toBeGreaterThan(0);

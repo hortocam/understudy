@@ -619,7 +619,7 @@ API lacks (constitution II).
 
 **Goal**: the guarantees the slice sells, each shown to **fail when broken**.
 
-- [ ] T079 [P] [US3] **Determinism** — `tests/integration/determinism.test.ts` (SC-002, US3.1–3.3):
+- [X] T079 [P] [US3] **Determinism** — `tests/integration/determinism.test.ts` (SC-002, US3.1–3.3):
       from a wiped store, same seed + config + fixtures + pinned `clock.start`: generate twice,
       serialise both stores with the canonical serialiser `tests/helpers/serialize.ts` (rows
       sorted by `(collection, identity)`, keys sorted, `created_at`/`updated_at` included) and
@@ -628,26 +628,26 @@ API lacks (constitution II).
       run once, each must fail the test): replace the per-collection RNG with one shared stream;
       read `Date.now()` per record instead of once; iterate parents in `Map` insertion order of a
       shuffled input.
-- [ ] T080 [P] [US3] **Independence** — `tests/integration/independence.test.ts` (SC-007, US3.4,
+- [X] T080 [P] [US3] **Independence** — `tests/integration/independence.test.ts` (SC-007, US3.4,
       Scenario 3): add an unrelated collection to the recipe, same seed ⇒ every pre-existing
       collection's serialised rows are **byte-identical**; the same holds when the new
       collection is named to sort *before* every existing one and when it is inserted first in the
       recipe file. **NC**: the shared-stream mutation from T079 must make this fail while
       T079's double-run still passes — the "green determinism, red independence" trap research §1
       names.
-- [ ] T081 [P] [US1] **Fixture immutability** — `tests/integration/immutability.test.ts` (SC-003):
+- [X] T081 [P] [US1] **Fixture immutability** — `tests/integration/immutability.test.ts` (SC-003):
       byte-compare the serialised `static` rows (and the fixture files) before and after
       generation **and** a scripted API session (create ×N, read, list, filter, page, PATCH/DELETE
       of non-static rows, `reset wipe`); identical in 100% of 20 seeded runs. **NC**: the T043
       mutation.
-- [ ] T082 [P] [US2] **Scale** — `tests/integration/scale.test.ts` (SC-008): a recipe of ≥5 000
+- [X] T082 [P] [US2] **Scale** — `tests/integration/scale.test.ts` (SC-008): a recipe of ≥5 000
       records over ≥5 collections is generated and `GET /health` answers within a stated budget
       (assert **< 30 s** hard, print the measured time; the spec's "well under a minute" is the
       claim, 30 s the bar); memory stays flat while generating (heap high-water mark does not
       scale with count between 1 000 and 10 000 — compare, with a stated ratio bound). **NC**:
       `insertMany` replaced by per-row autocommit; the time bound must fail on the same input
       (proves the bound can fail).
-- [ ] T083 [P] [FND] **Seal slice 1's T043 blind spot** — `tests/integration/store-boundary.test.ts`
+- [X] T083 [P] [FND] **Seal slice 1's T043 blind spot** — `tests/integration/store-boundary.test.ts`
       with `tests/helpers/sql-probe.ts`: a **driver-level probe** wraps
       `better-sqlite3`'s `Database#prepare` and records, per statement, its SQL text, bound
       parameters, and **rows returned by `all()`/`iterate()`**. Over a collection of 20 000
@@ -659,7 +659,7 @@ API lacks (constitution II).
       `listPaged` as `SELECT * … ; slice()` passes the **old** decorator suite and **fails** this
       probe — the test file asserts both. Fails first against the double, passes against
       `SqliteStore`.
-- [ ] T084 [US3] Make T079–T083 green; run each `NC` once, paste the failing assertion into the
+- [X] T084 [US3] Make T079–T083 green; run each `NC` once, paste the failing assertion into the
       PR, and revert the mutation. No mutation is committed.
 
 **Checkpoint**: determinism, independence, immutability, scale and the store boundary are each
@@ -884,3 +884,20 @@ nowhere.
   and the recipe body). A recipe's own `seed:` wins over the configuration's; `--seed` wins over both.
 - **FR-015 paging agreement.** The report adds `paging-not-exercised` (a declared page cap that the
   collection fits inside) and `unpaged-large-collection` (> 100 records, no declared paging).
+- **T079–T084 — negative controls (each run once, each failed on a real assertion, none committed).**
+  Recorded verbatim in the PR. Shared stream → independence red while the double-run determinism
+  tests stay green (the research §1 trap, demonstrated); wall clock per record, shuffled parent order
+  → determinism red; generation writing `origin: 'static'` → immutability red; `SqliteStore` no longer
+  binding LIMIT → the driver probe red on the real store.
+- **T082 — what was changed and why (my own task text, corrected).** The task asked that heap
+  "stay flat". Generation builds a whole run in memory so it can be written atomically (a failed run
+  stores nothing — T070, principle V), so memory is O(records) by design; the test asserts a small
+  per-record constant (measured ≈ 0.7–2.4 KB/record) instead of flatness, and says so. The
+  per-row-autocommit mutation did **not** breach the 30 s bar on this container's filesystem (commit
+  cost is negligible here), so that mutation does not prove the bound can fail; an injected 6 ms/record
+  cost does (46.6 s > 30 s). Measured: 6 711 records over 5 collections generated, started and serving
+  `/health` in ≈ 2.2 s.
+- **T083 — shipped as designed.** `tests/helpers/sql-probe.ts` wraps `Database#prepare` and records
+  SQL, params and rows crossing into JS; offset/limit, page/size and cursor are each asserted over
+  20 000 rows; `MaterialisingStore` (reads everything through the driver, slices in JS) returns a
+  correct page at the `Store` interface and is rejected by the probe (`20000 rows`, `no bound LIMIT`).
