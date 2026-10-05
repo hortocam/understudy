@@ -1,0 +1,105 @@
+quickstart.md — recorded end-to-end run against a built dist/
+command: node dist/cli/index.js  (== ustdy; bin name ustdy -> dist/cli/index.js)
+date:    2026-10-05T15:16:43Z
+node:    v22.23.2
+================================================================================
+
+## Prerequisites
+$ npm ci
+$ npm run build
+(both already run; see the gate output)
+
+## 3. Start it
+understudy: /home/hermes/projects/understudy/.worktrees/t_5c7dd75a/tests/fixtures/inventory-api.yaml
+  spec version 3.1.0 (normalised to 3.1.0), sha256 bbcf00b627f1
+  clock: real
+
+live operations (5):
+  POST /inventory (createInventory)
+  GET /inventory (listInventory)
+  GET /inventory/{id} (getInventoryById)
+  PATCH /inventory/{id} (updateInventory)
+  DELETE /inventory/{id} (deleteInventory)
+
+not selected (1):
+  GET /events (listEvents)
+
+entities derived (1):
+  Inventory (/inventory instance /inventory/{id}) id=id:integer params=[limit:paging,offset:paging,sku:filter] name=schema-title
+
+relationships inferred (0):
+
+ambiguities (0):
+{"time":"2026-10-05T15:16:44.298Z","level":"info","message":"startup report","report":{"spec":{"source":"/home/hermes/projects/understudy/.worktrees/t_5c7dd75a/tests/fixtures/inventory-api.yaml","version":"3.1.0","sourceVersion":"3.1.0","contentHash":"bbcf00b627f1a097af94f53361a223c1542d578ce844972c1920e9f2b8c37ef5"},"clock":{"mode":"real"},"live":[{"method":"POST","path":"/inventory","operationId":"createInventory"},{"method":"GET","path":"/inventory","operationId":"listInventory"},{"method":"GET","path":"/inventory/{id}","operationId":"getInventoryById"},{"method":"PATCH","path":"/inventory/{id}","operationId":"updateInventory"},{"method":"DELETE","path":"/inventory/{id}","operationId":"deleteInventory"}],"notSelected":[{"method":"GET","path":"/events","operationId":"listEvents"}],"selection":{"mixed":false,"forms":["method-path"],"resolved":[{"entry":"POST   /inventory","form":"method-path","methodPath":"POST /inventory","operationId":"createInventory"},{"entry":"GET    /inventory","form":"method-path","methodPath":"GET /inventory","operationId":"listInventory"},{"entry":"GET    /inventory/{id}","form":"method-path","methodPath":"GET /inventory/{id}","operationId":"getInventoryById"},{"entry":"PATCH  /inventory/{id}","form":"method-path","methodPath":"PATCH /inventory/{id}","operationId":"updateInventory"},{"entry":"DELETE /inventory/{id}","form":"method-path","methodPath":"DELETE /inventory/{id}","operationId":"deleteInventory"}]},"resources":[{"name":"Inventory","collectionPath":"/inventory","idField":"id","idType":"integer","listParams":[{"name":"limit","in":"query","kind":"paging","required":false},{"name":"offset","in":"query","kind":"paging","required":false},{"name":"sku","in":"query","kind":"filter","required":false}],"operations":{"list":{"method":"GET","path":"/inventory","operationId":"listInventory"},"create":{"method":"POST","path":"/inventory","operationId":"createInventory"},"read":{"method":"GET","path":"/inventory/{id}","operationId":"getInventoryById"},"update":{"method":"PATCH","path":"/inventory/{id}","operationId":"updateInventory"},"delete":{"method":"DELETE","path":"/inventory/{id}","operationId":"deleteInventory"}},"nameSource":"schema-title","instancePath":"/inventory/{id}","representationSchema":{"type":"array","title":"Inventory","items":{"type":"object","title":"Inventory","required":["id","sku","quantity"],"properties":{"id":{"type":"integer"},"sku":{"type":"string","minLength":1},"quantity":{"type":"integer","minimum":0},"notes":{"type":["string","null"]}}}},"createSchema":{"type":"object","title":"InventoryCreate","required":["sku","quantity"],"additionalProperties":false,"properties":{"sku":{"type":"string","minLength":1},"quantity":{"type":"integer","minimum":0},"notes":{"type":["string","null"]}}},"updateMode":"merge"}],"relationships":[],"ambiguities":[]}}
+ready: control plane at http://127.0.0.1:8080/__understudy  mock at http://127.0.0.1:8080
+
+## 3 (structured probe, as written)
+true
+SC-006: report carries the live set
+
+## 4. CRUD persists across a restart
+$ curl -s -X POST localhost:8080/inventory -H content-type: application/json -d {"sku":"GA-100","quantity":4}
+{"sku":"GA-100","quantity":4,"id":100000}
+ID=100000
+{"sku":"GA-100","quantity":4,"id":100000}
+$ node dist/cli/index.js down; node dist/cli/index.js up --config ./understudy.yaml
+torn down: http://127.0.0.1:8080/__understudy released
+after restart:
+{"sku":"GA-100","quantity":4,"id":100000}
+
+## 4 (negative control: read id 55 before any create)
+status 404
+
+## 5. Not-implemented is distinct
+GET /inventory/999999 -> 404
+GET /events           -> 501
+
+## 6. Validation is the document's
+POST bad body -> 400
+
+## 7. Control plane
+$ curl -s localhost:8080/__understudy/health
+{"status":"ok","store":{"reachable":true,"path":"./.understudy/state.db"}}
+$ curl -s localhost:8080/__understudy/operations
+{"live":[{"method":"POST","path":"/inventory","operationId":"createInventory"},{"method":"GET","path":"/inventory","operationId":"listInventory"},{"method":"GET","path":"/inventory/{id}","operationId":"getInventoryById"},{"method":"PATCH","path":"/inventory/{id}","operationId":"updateInventory"},{"method":"DELETE","path":"/inventory/{id}","operationId":"deleteInventory"}],"notImplemented":[{"method":"GET","path":"/events","operationId":"listEvents"}]}
+$ curl -s localhost:8080/__understudy/requests
+{"total":7}
+$ curl -s -X POST .../reset -H content-type: application/json -d {"mode":"wipe"}
+{"ok":true,"mode":"wipe","removed":{"Inventory":1}}
+$ curl -s .../requests?status=501
+{"total":1}
+$ curl -s .../openapi.json
+{"openapi":"3.1.0","title":"Understudy Control API"}
+
+## 8. CLI adds no logic
+$ node dist/cli/index.js ops list
+live operations (5):
+  POST /inventory (createInventory)
+  GET /inventory (listInventory)
+  GET /inventory/{id} (getInventoryById)
+  PATCH /inventory/{id} (updateInventory)
+  DELETE /inventory/{id} (deleteInventory)
+not implemented (1):
+  GET /events (listEvents)
+$ node dist/cli/index.js logs requests --status 501
+2026-10-05T15:16:47.650Z  501  GET /events  not-implemented  0ms
+$ node dist/cli/index.js reset --to wipe
+reset (wipe): rows removed per entity
+  Inventory: 0
+
+## 9. Instance isolation (distinct ports AND store files)
+$ curl -s -X POST localhost:8080/inventory -H content-type: application/json -d {"sku":"A","quantity":1}
+{"sku":"A","quantity":1,"id":100000}
+$ curl -s localhost:8081/inventory   # expected EMPTY []
+[]
+
+## 10. No hidden outbound calls (SC-008)
+Proven by tests/integration/outbound.test.ts, which runs this same lifecycle with an
+outbound spy installed and asserts zero non-loopback destinations.
+
+## teardown
+torn down: http://127.0.0.1:8081/__understudy released
+torn down: http://127.0.0.1:8080/__understudy released
+
+================================================================================
+END OF RECORDED RUN
