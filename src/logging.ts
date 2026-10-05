@@ -145,6 +145,23 @@ export function renderStartupReport(report: StartupReport): string {
     for (const index of report.indexes) lines.push(`  ${index.resource}.${index.field} (${index.reason})`);
   }
 
+  if (report.generation) {
+    const g = report.generation;
+    lines.push("");
+    lines.push(
+      g.regenerated
+        ? `generation: recipe ${g.recipe}, seed ${g.seed} — ${Object.values(g.created).reduce((n, c) => n + (c.generated ?? 0), 0)} records created, ${g.redraws} invariant redraws`
+        : `generation: recipe ${g.recipe}, seed ${g.seed} — already applied to this store; nothing regenerated`,
+    );
+    for (const [collection, counts] of Object.entries(g.created)) {
+      lines.push(`  created ${collection}: ${Object.entries(counts).map(([o, n]) => `${o} ${n}`).join(", ")}`);
+    }
+    for (const fallback of g.fallbacks) {
+      lines.push(`  fallback: ${fallback.collection}.${fallback.field} chosen by ${fallback.rule} (level ${fallback.level}) for ${fallback.count} records`);
+    }
+    for (const note of g.notes) lines.push(`  note: ${note}`);
+  }
+
   if (report.origins) {
     lines.push("");
     lines.push("records by origin:");

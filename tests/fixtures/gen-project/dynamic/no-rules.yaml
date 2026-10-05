@@ -1,0 +1,4 @@
+# A collection with NO field rules at all is still populated from the specification (US2.6).
+seed: 3
+entities:
+  AuditNote: { count: 20 }

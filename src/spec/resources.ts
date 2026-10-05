@@ -19,7 +19,7 @@ import type {
   Resource,
 } from "./types.js";
 import { patternSupported } from "./identity.js";
-import { PAGING_PARAM_NAMES, classifyPaging } from "./paging.js";
+import { LIMIT_NAMES, PAGING_PARAM_NAMES, classifyPaging } from "./paging.js";
 import type { IdSpaceKind } from "./types.js";
 
 const EVIDENCE_RANK: Record<RelationshipEvidence, number> = {
@@ -184,6 +184,10 @@ function listParamsOf(
     const itemEnum = schema && isObject(schema.items) && Array.isArray(schema.items.enum) ? schema.items.enum : undefined;
     const values = (enumValues ?? itemEnum)?.filter((v): v is string => typeof v === "string");
     if (values && values.length > 0) param.values = values;
+    if (param.kind === "paging" && schema) {
+      const cap = typeof schema.maximum === "number" ? schema.maximum : typeof schema.default === "number" ? schema.default : undefined;
+      if (cap !== undefined && LIMIT_NAMES.includes(param.name.toLowerCase())) param.pageCap = cap;
+    }
     return param;
   });
 }

@@ -23,10 +23,12 @@ import { loadBehavior } from "./config/layers/behavior.js";
 import { loadFixtures } from "./config/layers/fixtures.js";
 import { loadImportMappings } from "./config/layers/imports.js";
 import { loadRecipes, selectRecipe } from "./config/layers/recipes.js";
-import { ConfigRefusedError, type Refusal } from "./errors.js";
+import { ConfigRefusedError, RecipeNotFoundError, type Refusal } from "./errors.js";
 import { createClock } from "./clock.js";
 import { buildGenerationPlan } from "./data/plan.js";
 import { applyFixtures } from "./data/fixtures.js";
+import { generate, type GenerationSummary } from "./data/generate.js";
+import { createHash } from "node:crypto";
 import { planIdentity, type IdentityPlan } from "./data/identity.js";
 import { indexReasons } from "./spec/report.js";
 import { effectiveSeed } from "./config/load.js";
@@ -52,7 +54,19 @@ export interface MockOptions {
   onListening?: (port: number) => void;
 }
 
+/** A collection with no declared paging above this size is called out: its list returns everything. */
+const UNPAGED_LARGE = 100;
+
+export interface GenerateOptions {
+  /** Recipe name; omitted means the configured one. */
+  recipe?: string;
+  /** Overrides the recipe's and the configuration's seed. */
+  seed?: number;
+}
+
 export interface RunningMock {
+  /** Apply a recipe to this running mock (FR-021): the same code path the control API's `POST /generate` uses. */
+  generate(options?: GenerateOptions): Promise<GenerationSummary>;
   /** The mocked surface's base URL, e.g. `http://127.0.0.1:54321`. */
   baseUrl: string;
   port: number;
@@ -224,6 +238,70 @@ export async function createMock(
     report.ambiguities.push(...model.ambiguities.filter((a) => a.kind === "lookup-only" && !report.ambiguities.includes(a)));
     report.origins = store.countByOrigin();
 
+    // 5c. Generation (FR-021): one data-driven pass over the plan, atomic as a whole, serialised so
+    // two requests never interleave. The startup run and the control API's `POST /generate` share it.
+    const fixtureTables = fixtureSummary.tables;
+    const fingerprintBase = JSON.stringify({
+      spec: spec.contentHash,
+      entities: config.entities,
+      ids: config.ids,
+      inference: config.inference,
+      clockStart: config.clock?.start ?? null,
+      fixtures: [...fixtureTables].map(([name, t]) => [name, t.rows.map((r) => r.row)]),
+    });
+    let queue: Promise<unknown> = Promise.resolve();
+    const doGeneration = async (opts: GenerateOptions): Promise<GenerationSummary> => {
+      const name = opts.recipe ?? config.recipe;
+      if (name === undefined) throw new RecipeNotFoundError("(no recipe configured)", [...recipes.keys()]);
+      const chosen = selectRecipe(recipes, name);
+      const chosenPlan = buildGenerationPlan({ model, recipe: chosen, entities: config.entities });
+      if (chosenPlan.refusals.length > 0) throw new ConfigRefusedError(chosenPlan.refusals);
+      const summary = await generate({
+        store,
+        resources: model.resources,
+        plan: chosenPlan,
+        recipe: chosen,
+        seed: opts.seed ?? effectiveSeed(config, chosen),
+        clock,
+        tables: fixtureTables,
+        identityPlans,
+        fingerprint: createHash("sha256").update(fingerprintBase).update(JSON.stringify([chosen.entities, chosen.generators])).digest("hex"),
+      });
+      report.origins = store.countByOrigin();
+      report.generation = summary;
+      // FR-015: the count and the declared paging style must agree — say so when generation did
+      // not (or could not) exercise the paging the document declares.
+      report.ambiguities = report.ambiguities.filter((a) => a.kind !== "paging-not-exercised" && a.kind !== "unpaged-large-collection");
+      for (const resource of model.resources) {
+        const total = Object.values(report.origins[resource.name] ?? {}).reduce((n, c) => n + (c ?? 0), 0);
+        const generated = summary.counts[resource.name]?.generated ?? 0;
+        if (generated === 0) continue;
+        const cap = resource.listParams.find((p) => p.pageCap !== undefined)?.pageCap;
+        if (resource.pagingStyle !== "none-declared" && cap !== undefined && total <= cap) {
+          report.ambiguities.push({
+            kind: "paging-not-exercised",
+            subject: resource.name,
+            detail: `${resource.name} declares ${resource.pagingStyle} paging with a page of up to ${cap}, but holds ${total} records, so a list is one page and no continuation exists; raise its count to exercise paging`,
+          });
+        } else if (resource.pagingStyle === "none-declared" && total > UNPAGED_LARGE) {
+          report.ambiguities.push({
+            kind: "unpaged-large-collection",
+            subject: resource.name,
+            detail: `${resource.name} declares no paging but holds ${total} records: every list request returns the whole collection, as the document declares`,
+          });
+        }
+      }
+      report.recipe = chosen.name;
+      report.seed = opts.seed ?? effectiveSeed(config, chosen);
+      return summary;
+    };
+    const runGeneration = (opts: GenerateOptions = {}): Promise<GenerationSummary> => {
+      const next = queue.then(() => doGeneration(opts));
+      queue = next.catch(() => undefined);
+      return next;
+    };
+    if (recipe) await runGeneration({});
+
     // 6. Serve the mocked surface and the control plane. Only after 1–5 have succeeded does
     // anything bind.
     const server = buildMockServer({
@@ -318,6 +396,7 @@ export async function createMock(
     }
 
     return {
+      generate: runGeneration,
       baseUrl: `http://${host}:${boundPort}`,
       port: boundPort,
       report,

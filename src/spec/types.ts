@@ -70,6 +70,8 @@ export interface ListParam {
   required: boolean;
   /** The parameter's declared enum values, when it has them (a `sort` parameter's sortable fields). */
   values?: string[];
+  /** A paging parameter's declared size cap (`maximum`, else `default`) — what one page can hold. */
+  pageCap?: number;
 }
 
 /** The identity space a collection's reserved range lives in (FR-017, Amendment D). */
@@ -198,6 +200,22 @@ export interface IdentityReport {
   unreservable: boolean;
 }
 
+/** What the generation run did (FR-021): counts by collection and origin, and where each value came from (FR-010). */
+export interface GenerationReport {
+  recipe: string;
+  seed: number;
+  /** False when the store already held this recipe+seed+configuration and nothing was generated (D7). */
+  regenerated: boolean;
+  /** Records this run created, by collection then origin. */
+  created: Record<string, Partial<Record<"static" | "imported" | "generated" | "runtime", number>>>;
+  /** For each collection and field: how many values each precedence level supplied. */
+  provenance: Record<string, Record<string, Record<string, number>>>;
+  /** Fields whose values were chosen by a heuristic or a type default (levels 5–6) — the report says so. */
+  fallbacks: Array<{ collection: string; field: string; rule: string; level: number; count: number }>;
+  redraws: number;
+  notes: string[];
+}
+
 export interface StartupReport {
   spec: {
     source: string;
@@ -213,6 +231,7 @@ export interface StartupReport {
   plan?: PlanSummary;
   /** Per-collection identity space and reserved range. */
   identity?: IdentityReport[];
+  generation?: GenerationReport;
   indexes: IndexReason[];
   /** Record counts per collection and origin, once the store is populated (FR-004). */
   origins?: Record<string, Partial<Record<"static" | "imported" | "generated" | "runtime", number>>>;

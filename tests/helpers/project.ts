@@ -106,3 +106,19 @@ export function readTree(dir: string, base = dir): Record<string, string> {
 export function fixturesProject(name: string): Record<string, string> {
   return readTree(fixturePath(name));
 }
+
+const PINNED_CLOCK = 'clock:\n  mode: real\n  start: "2026-01-01T00:00:00Z"\n';
+
+/** Start the generation project with a recipe selected, a pinned clock and (optionally) extra config. */
+export async function startGen(
+  recipe: string | undefined,
+  options: { config?: string; seed?: number; dir?: string; files?: Record<string, string>; project?: string; out?: string[] } = {},
+): Promise<{ dir: string; mock: RunningMock }> {
+  const files = { ...fixturesProject(options.project ?? "gen-project"), ...(options.files ?? {}) };
+  const config = `${PINNED_CLOCK}${recipe ? `recipe: ${recipe}\n` : ""}${options.seed !== undefined ? `seed: ${options.seed}\n` : ""}${options.config ?? ""}`;
+  return startProject(files, {
+    config,
+    ...(options.dir ? { dir: options.dir } : {}),
+    ...(options.out ? { mock: { out: (t: string) => options.out?.push(t) } } : {}),
+  });
+}

@@ -290,3 +290,13 @@ export function allocateIdentity(resource: Resource, counter: number): string {
   }
   return String(counter);
 }
+
+
+/** A stored identity (text) typed back to the form the document declares: a number for an integer identity. */
+export function typedIdentityValue(resource: Pick<Resource, "idType">, identity: string): string | number {
+  if (resource.idType === "integer") {
+    const value = Number.parseInt(identity, 10);
+    return Number.isNaN(value) ? identity : value;
+  }
+  return identity;
+}

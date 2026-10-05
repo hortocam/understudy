@@ -1,0 +1,21 @@
+# A small, fast dataset for CI: three generated venues, events per venue, inventory per event.
+seed: 42
+entities:
+  Venue: { count: 3 }
+  Event:
+    perParent: { entity: Venue, range: [2, 4], distribution: uniform }
+    fields:
+      category: { choice: [music, sport] }
+  Inventory:
+    perParent: { entity: Event, range: [5, 12], distribution: zipf }
+    fields:
+      section:  { generator: sectionCode }
+      row:      { faker: "string.alpha", length: 1, casing: upper }
+      quantity: { faker: "number.int", min: 2, max: 8 }
+      cost:     { faker: "finance.amount", min: 20, max: 400, dec: 2 }
+      price:    { expr: "cost * $uniform(1.1, 2.5)" }
+      statusId: { lookup: InventoryStatus, weights: { available: 0.8, held: 0.1, sold: 0.1 } }
+    constraints:
+      - "price >= cost"
+generators:
+  sectionCode: { choice: ["100", "101", "102", "200", "201", "FLOOR", "GA"] }

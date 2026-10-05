@@ -21,7 +21,8 @@
             "name": "maxPageSize",
             "in": "query",
             "schema": {
-              "type": "integer"
+              "type": "integer",
+              "maximum": 50
             }
           }
         ],

@@ -25,6 +25,11 @@ export interface CollectionSpec {
   redraws?: number;
   /** DECIDED links from this collection's fields to parents. */
   links?: Array<{ field: string; to: string; toField: string }>;
+  /**
+   * Fields left out of the record entirely: a link that points at a collection not generated yet
+   * (a reported cycle, FR-008) or at one with no records, on a field the schema does not require.
+   */
+  omit?: string[];
 }
 
 export interface GeneratedRecord {
@@ -73,7 +78,8 @@ export async function generateRecord(
   const properties = propertiesOf(resource);
   const declared = Object.keys(properties).filter((n) => n !== resource.idField);
   const extra = Object.keys(fields).filter((n) => !declared.includes(n) && n !== resource.idField);
-  const order = fieldOrder([...declared, ...extra], fields);
+  const omitted = new Set(spec.omit ?? []);
+  const order = fieldOrder([...declared, ...extra].filter((n) => !omitted.has(n)), fields);
   const budget = spec.redraws ?? DEFAULT_REDRAWS;
   const constraints = spec.constraints ?? [];
 
