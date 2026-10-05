@@ -392,16 +392,16 @@ fixture layer).
 produced it**. No store here — pure functions, so determinism is cheap to prove.
 **Golden families: precedence, generators.**
 
-- [ ] T046 [P] [US3] Test for **seed derivation** in `tests/unit/seed.test.ts`: same
+- [X] T046 [P] [US3] Test for **seed derivation** in `tests/unit/seed.test.ts`: same
       `(seed, name)` ⇒ same stream across 10 constructions; different names ⇒ different first
       draws; the derivation is **not** index-ordered (insert a name, others unchanged — the
       SC-007 mechanism, asserted on the derivation alone); a vector of fixed `(seed,name) →
       first 5 draws` is checked in as a golden so a library upgrade that changes Mersenne output
       is caught. Fails first.
-- [ ] T047 [US3] Implement `src/data/seed.ts`: `hash(globalSeed, name)` (sha256 → uint32) →
+- [X] T047 [US3] Implement `src/data/seed.ts`: `hash(globalSeed, name)` (sha256 → uint32) →
       `Rng` (`next()`, `int(lo,hi)`, `pick`, `weighted`) and a Faker instance bound to that
       stream with `setDefaultRefDate(clock.now())` (research §1 trap). One stream per collection.
-- [ ] T048 [P] [US7] **Generators golden test** in `tests/unit/generators.golden.test.ts`, one
+- [X] T048 [P] [US7] **Generators golden test** in `tests/unit/generators.golden.test.ts`, one
       table per built-in with a fixed seed and the expected 20 values checked into
       `tests/fixtures/golden/generators-*.json`: `choice` (+ asserts every value ∈ set), `seq`
       (monotonic, named, independent per collection), `lookup` (uniform and weighted; **weighted
@@ -410,26 +410,26 @@ produced it**. No store here — pure functions, so determinism is cheap to prov
       `faker` (path + args, e.g. `string.alpha` length 1 upper; unknown path refuses naming it),
       `expr` (below). **NC**: swap the weighted draw for a uniform one; the weights test must
       fail. Fails first.
-- [ ] T049 [P] [US7] Test the **registry** in `tests/unit/registry.test.ts`: built-ins and
+- [X] T049 [P] [US7] Test the **registry** in `tests/unit/registry.test.ts`: built-ins and
       custom generators share **one namespace** (FR-012); a custom `choice` generator from
       `generators:` in a recipe is used exactly like a built-in; a **plugin file** generator
       (path in config, ESM default export `(ctx) => value`) is loaded with a **config-relative**
       path and is given only the collection's seeded `Rng` (so it cannot break determinism by
       construction); a name collision between custom and built-in refuses naming both; an
       unknown generator refuses naming it. Fails first.
-- [ ] T050 [US7] Implement `src/data/generators/{registry,faker,lookup,reference,sequence,choice}.ts`
+- [X] T050 [US7] Implement `src/data/generators/{registry,faker,lookup,reference,sequence,choice}.ts`
       to make T048/T049 pass.
-- [ ] T051 [P] [US2] Test for **`expr`** in `tests/unit/expr.test.ts`: `price: cost * $uniform(1.1,
+- [X] T051 [P] [US2] Test for **`expr`** in `tests/unit/expr.test.ts`: `price: cost * $uniform(1.1,
       2.5)` is evaluated **after** `cost`; the result equals `cost × the seeded draw` (recompute
       from the stream); `$uniform`/`$choice` draw from the **collection's** stream (re-running
       gives identical output; a sibling collection's draws do not shift it); a field depending
       on a field with a later declaration still orders correctly; a cycle is refused at load
       (T015); a runtime type error (JSONata signature mismatch) fails **loudly naming the
       field**. Fails first.
-- [ ] T052 [US2] Implement `src/data/generators/expr.ts`: JSONata with seeding-aware helpers
+- [X] T052 [US2] Implement `src/data/generators/expr.ts`: JSONata with seeding-aware helpers
       registered via `registerFunction` **with signatures**; evaluation order from T015's
       dependency edges.
-- [ ] T053 [P] [US7] **Precedence golden test** in `tests/unit/precedence.golden.test.ts` — the
+- [X] T053 [P] [US7] **Precedence golden test** in `tests/unit/precedence.golden.test.ts` — the
       FR-010 chain, one field walked down all six levels by removing a source at a time
       (US7 independent test): (1) explicit rule → (2) supplied value → (3) lookup reference → (4)
       the document's enum/format/range/example/default → (5) faker heuristic by name+format →
@@ -439,12 +439,12 @@ produced it**. No store here — pure functions, so determinism is cheap to prov
       falls through to the heuristic (FR-014); a field with nothing falls to level 6 and the
       provenance says `type-default`; **a heuristic-chosen value is flagged** so the report can
       say "chosen by a fallback" (US7.4). Fails first.
-- [ ] T054 [US7] Implement `src/data/precedence.ts`: `chooseValue(field, ctx) → {value,
+- [X] T054 [US7] Implement `src/data/precedence.ts`: `chooseValue(field, ctx) → {value,
       provenance}`; the **static** counterpart `planField(field)` that reports which level *will*
       supply each unruled field (feeds `GenerationPlan.fieldRules` and the report, T037) so the
       two can never disagree — they are one function with a dry-run flag, not two
       implementations (research §5 alternative rejected).
-- [ ] T055 [P] [US2] Test **schema conformance** in `tests/unit/conformance.test.ts` (FR-014,
+- [X] T055 [P] [US2] Test **schema conformance** in `tests/unit/conformance.test.ts` (FR-014,
       SC-004): property-style over a fixture schema exercising `enum`, `format`
       (`date-time`,`date`,`uuid`,`email`,`uri`), `minimum/maximum/exclusive*`,
       `minLength/maxLength`, `pattern` (the supported subset), `minItems/maxItems`, nested
@@ -452,10 +452,10 @@ produced it**. No store here — pure functions, so determinism is cheap to prov
       validates** against the Ajv validator compiled from the document. A schema construct the
       generator cannot satisfy refuses naming collection and field (never stores a
       non-conforming record, never silently loosens). Fails first.
-- [ ] T056 [US2] Implement the schema-driven level-4/5/6 generator in `src/data/precedence.ts`
+- [X] T056 [US2] Implement the schema-driven level-4/5/6 generator in `src/data/precedence.ts`
       + `src/data/generators/faker.ts` (name+format heuristics, e.g. `email`, `*Name`, `*At`,
       `price`/`amount`, `quantity`), reusing `src/spec/identity.ts` for `pattern` strings.
-- [ ] T057 [P] [US2] Test **invariants** in `tests/unit/invariants.test.ts` (FR-013, US2.5):
+- [X] T057 [P] [US2] Test **invariants** in `tests/unit/invariants.test.ts` (FR-013, US2.5):
       `constraints: ["price >= cost"]` holds on 1 000 records; a satisfiable-but-rare invariant
       is met by **redraw** (assert `redraws > 0` was used and the final record satisfies it);
       an **impossible** one fails after exactly `redraws` attempts with
@@ -463,10 +463,10 @@ produced it**. No store here — pure functions, so determinism is cheap to prov
       stored**; `redraws` is configurable and counted per record; a constraint that fails to
       parse refuses at load. **NC**: set the budget to 0 on the satisfiable case; the test must
       then fail loudly (not pass vacuously). Fails first.
-- [ ] T058 [US2] Implement `src/data/invariants.ts` (redraw the record's *drawn* fields — never
+- [X] T058 [US2] Implement `src/data/invariants.ts` (redraw the record's *drawn* fields — never
       supplied, linked or identity fields — under the **same** stream, so the redraw is
       deterministic).
-- [ ] T059 [US7] Make T046–T057 green; show red→green per task in the PR.
+- [X] T059 [US7] Make T046–T057 green; show red→green per task in the PR.
 
 **Checkpoint**: given a document, a recipe and a seed, a record's values and their provenance are
 a pure, reproducible function — before any row is written.
@@ -836,3 +836,20 @@ nowhere.
 - **T043 — D2 delivered.** `spec.md` FR-002/SC-003 amended and A4 recorded (spec-first, in this
   change); the `OPEN-D2` placeholder dropped; the structural test asserts exactly one source file
   writes `origin: "static"`.
+- **T053/T054 — FR-010 read as written (flag for the owner).** `data-model.md` §2's "level it
+  satisfies" column puts an explicit `faker:` rule at level 5 and a `lookup:` rule at level 3, which
+  would let a spec `enum` (4) or a supplied value (2) override a rule the developer wrote — the
+  opposite of FR-010 (1) and US7.1. The spec governs: **any explicit recipe rule is level 1**, and
+  `provenance.rule` records its kind (`faker:string.alpha`, `lookup:InventoryStatus`, `expr`, …).
+  Level 3 is the implicit reference an unruled field takes when a DECIDED link points at a parent.
+  Level 4 inner order: const, enum, examples, default. The precedence golden is hand-authored.
+- **T048 — generator value vectors.** A fixed seed's output cannot be hand-authored; the
+  `generators-*.json` goldens are *regression vectors* captured once with `UPDATE_GOLDEN=1`,
+  reviewed for plausibility (membership, weights, bounds) and checked in. The structural guarantees
+  (membership, the 0.8/0.1/0.1 shape, monotonic sequences) are asserted directly alongside.
+- **T056 — pattern generation.** faker's `fromRegExp` does not strip `^`/`$` or understand `\d`,
+  so a declared pattern is normalised (anchors stripped, `\d`/`\w` spelled out) before it is
+  handed over and the result is verified against the original pattern; a construct outside what it
+  can satisfy (a lookahead) refuses naming the field. An RFC 3339 `time` needs a zone (`…Z`).
+- **T052 — expressions.** `$now()`/`$millis()` are overridden to the clock seam's instant; an
+  expression that yields nothing (a missing sibling) is an error, never a silently dropped field.

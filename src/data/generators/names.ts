@@ -4,7 +4,7 @@
  * faker method paths a `faker:` rule may use. Kept apart from the registry so the config
  * reconciler can ask "does this name exist?" without importing the generators themselves.
  */
-import { Faker, en } from "@faker-js/faker";
+import { Faker, base, en } from "@faker-js/faker";
 
 /** The built-in named generators, usable in a `generator:` rule exactly like a custom one. */
 export const BUILTIN_GENERATOR_NAMES: ReadonlySet<string> = new Set([
@@ -30,7 +30,7 @@ export const BUILTIN_GENERATOR_NAMES: ReadonlySet<string> = new Set([
 /** Faker helpers that interpret a template string as code/markup: never reachable from config. */
 const DENIED = new Set(["helpers.fake", "helpers.mustache"]);
 
-const probe = new Faker({ locale: [en] });
+const probe = new Faker({ locale: [en, base] });
 
 /** True when `path` ('module.method', e.g. 'string.alpha') names a callable faker method. */
 export function isFakerPath(path: string): boolean {
