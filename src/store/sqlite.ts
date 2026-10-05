@@ -234,6 +234,18 @@ export class SqliteStore implements Store {
     return { ...record };
   }
 
+  transaction<T>(fn: () => T): T {
+    const db = this.#require();
+    try {
+      return db.transaction(() => {
+        db.pragma("defer_foreign_keys = ON");
+        return fn();
+      })();
+    } catch (error) {
+      return translate(error, "(transaction)", "write");
+    }
+  }
+
   insertMany(records: NewRecord[]): void {
     const db = this.#require();
     db.transaction(() => {
@@ -406,9 +418,9 @@ export class SqliteStore implements Store {
     return { sql, bindings };
   }
 
-  update(resource: string, identity: string, data: unknown): StoredRecord | undefined {
+  update(resource: string, identity: string, data: unknown, atInstant?: string): StoredRecord | undefined {
     this.ensureResource(resource);
-    const at = nowIso();
+    const at = atInstant ?? nowIso();
     const body = JSON.stringify(data);
     const foreignKeys = this.#specs.get(resource)?.foreignKeys ?? [];
     let sql = this.#updateSql.get(resource);

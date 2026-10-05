@@ -130,6 +130,12 @@ export interface Store {
   ensureResource(resource: string, options?: ResourceOptions): void;
 
   insert(resource: string, identity: string, data: unknown, origin?: Origin): StoredRecord;
+  /**
+   * Run `fn` as one transaction: everything it does commits together or not at all. Foreign-key
+   * checks are deferred to the commit, so a restrict link passes when parent and children change
+   * together and still refuses if a referencing row would remain.
+   */
+  transaction<T>(fn: () => T): T;
   /** Insert many records in ONE transaction: all of them or none (principle V, narrow form). */
   insertMany(records: NewRecord[]): void;
   readOne(resource: string, identity: string): StoredRecord | undefined;
@@ -148,7 +154,8 @@ export interface Store {
    * properties.
    */
   listPaged(resource: string, query?: ListQuery): StoredRecord[];
-  update(resource: string, identity: string, data: unknown): StoredRecord | undefined;
+  /** `at` sets `updated_at` explicitly (the clock seam's instant); omitted, the real time is used. */
+  update(resource: string, identity: string, data: unknown, at?: string): StoredRecord | undefined;
   delete(resource: string, identity: string): boolean;
 
   /** Delete every stored record, leaving the schema in place. */

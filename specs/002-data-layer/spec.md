@@ -226,7 +226,11 @@ falls to the next rule in the documented order; repeat down the chain and confir
   records and lookup tables), imports, generation recipes, and behaviour — each from its own file
   or folder, loadable without the others being present.
 - **FR-002**: Fixture configuration (fixed records and lookup tables) MUST be applied identically
-  on every run and MUST NEVER be modified by generation, import, or activity over the mocked API.
+  on every run and MUST NEVER be modified by generation or import. Activity over the mocked API
+  MUST NEVER rewrite the fixture **files**; an API `PATCH`/`PUT`/`DELETE` addressed to a record that
+  came from fixtures is a mutation of that record in the store (the core slice's CRUD semantics —
+  a mock that refused would behave unlike the service it stands in for), and the next start
+  re-applies the files, restoring it. (Amended by A4, below.)
   Fixture configuration MUST be selected against the same operation-selection grammar the core
   slice delivers: **`METHOD /path`, `operationId` and a tag selector are three peers with no
   precedence** — a document may support any one of them as its only workable form, so none is a
@@ -353,8 +357,11 @@ falls to the next rule in the documented order; repeat down the chain and confir
   or per-field code for the collections they do not care about.
 - **SC-002**: Two generations from a wiped store with the same seed and configuration produce
   **byte-identical** exports; with a different seed, the exports differ.
-- **SC-003**: Fixture records are **byte-identical** before and after any amount of generation and
-  API activity, in **100%** of runs.
+- **SC-003**: Fixture records are **byte-identical** before and after any amount of generation,
+  import, reads, lists, creates over the API and `wipe`, in **100%** of runs; the fixture **files**
+  are byte-identical after any activity at all; and every start re-applies the files, so fixture
+  records equal what the files say. (Amended by A4, below: a write the API addresses to a fixture
+  record is a mutation and is outside this guarantee.)
 - **SC-004**: **100%** of generated records conform to the specification's schema, and **100%** of
   declared relationships resolve to a record that exists in the store.
 - **SC-005**: Every derived relationship in the startup report names its evidence source, and every
@@ -460,3 +467,40 @@ invented — each change pins an existing MUST to facts that make it testable.
 does not authorise implementation code (the plan and tasks land separately under the normal
 spec→plan→tasks checkpoints), does not move webhook *delivery* into this slice, and does not touch
 slice 1's specification or its contracts.
+
+---
+
+## Amendment 2026-10-05 — A4: scope the fixture-immutability guarantee to the layers that own the rows
+
+**Approved by:** the project owner (human), at the `tasks.md` checkpoint (decision D2).
+**Recorded by:** the implementing agent, in the same change as T043, because the spec is corrected
+to match the decision — never the code to match an unexamined sentence.
+
+**Why.** FR-002 and SC-003 said fixtures MUST NEVER be modified by "activity over the mocked API".
+The core slice (slice 1, merged) gives the mocked surface ordinary CRUD semantics: a `PATCH`,
+`PUT` or `DELETE` addressed to an identity that happens to be a fixture record mutates it. Making
+the literal sentence true would mean refusing those writes — new mocked-surface behaviour that
+slice 2's scope fence forbids ("slice 2 adds origins and population, not new CRUD behaviour") and
+that would make the mock differ from the service it stands in for. The two statements contradicted
+each other, and the contradiction would have been carried silently into a later slice.
+
+**What changed** (PATCH-class; no principle removed or redefined):
+
+| # | Requirement | Was | Now |
+|---|---|---|---|
+| A | FR-002 | never modified by generation, import, or API activity | never modified by generation or import; API activity never rewrites the fixture **files**; an API write addressed to a fixture record is a mutation, and the next start re-applies the files |
+| B | SC-003 | byte-identical after any amount of generation and API activity | byte-identical across generation, import, reads, lists, creates and `wipe`; files byte-identical after any activity; every start re-applies the files; an API write to a fixture record is outside the guarantee |
+
+**Alternatives rejected.** (1) *Refuse API writes to `static` rows* — new CRUD behaviour, a refusal the
+document does not declare, and a mock that behaves unlike the real service. (2) *Copy-on-write* (an
+API write forks a `runtime` copy) — invents an identity-collision rule the specification does not
+state. (3) *Leave the sentence and do not test it* — a requirement with no test and a known
+exception is a silent contradiction (constitution I).
+
+**Constitutional basis.** Principle IV is unchanged: fixtures are never mutated *by generation,
+import, or the tool*; what the mocked surface writes is `runtime`-origin data, and an edit the API
+makes to a fixture identity is the consumer's own request, reverted by the next start. Per
+Governance, nothing above this line was rewritten except the two requirement lines named in the
+table, and they cite this amendment.
+
+**Scope fence.** This amendment authorises the two requirement edits above and nothing else.

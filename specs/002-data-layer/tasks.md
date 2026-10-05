@@ -353,10 +353,10 @@ exists yet. Inference goldens green.
 **Independent Test**: fixtures file → start twice from a wiped store → byte-identical records;
 edit the file → restart → the change is the only difference.
 
-- [ ] T040 [P] [US1] Fixture documents/files for the phase: `tests/fixtures/fixtures-project/`
+- [X] T040 [P] [US1] Fixture documents/files for the phase: `tests/fixtures/fixtures-project/`
       (`understudy.yaml`, `static/lookups/*.yaml`, `static/entities/*.yaml`) built on
       `inventory-api.yaml` + a second collection with a decided link to it.
-- [ ] T041 [P] [US1] Integration test `tests/integration/fixtures.test.ts` (US1.1–1.4):
+- [X] T041 [P] [US1] Integration test `tests/integration/fixtures.test.ts` (US1.1–1.4):
       declared identities and values exist exactly; **start twice from a wiped store → the
       serialised static rows are byte-identical**; edit one fixture value, restart → only that
       row differs; remove a fixture row from the file, restart → the stale `static` row is gone;
@@ -364,22 +364,22 @@ edit the file → restart → the change is the only difference.
       one (US1.4 — assert the response bodies carry no origin field); the origin column is
       `static` for every fixture row and **`runtime` for everything the API wrote**; the fixture
       files on disk are byte-identical before/after (hash). Fails first.
-- [ ] T042 [US1] Implement `src/data/fixtures.ts`: reconcile the store's `static` rows to the
+- [X] T042 [US1] Implement `src/data/fixtures.ts`: reconcile the store's `static` rows to the
       `FixtureSet` in **one transaction** (insert/replace changed, delete stale static rows),
       the **only** code path that writes `origin='static'`; validate each body against the
       document's schema first (FR-014); order by FK DAG so parents precede children. Wire into
       `createMock` after table creation.
-- [ ] T043 [P] [US1] Test in `tests/integration/fixture-origin.test.ts`: no code path other than
+- [X] T043 [P] [US1] Test in `tests/integration/fixture-origin.test.ts`: no code path other than
       `fixtures.ts` can write a `static` row — assert by running generation, API CRUD and `wipe`
       and diffing `static` rows byte-for-byte (SC-003, narrowed per D2: fixture **files** never rewritten, fixture rows
       applied identically on every start, and `static` rows byte-identical across generation,
       reads, lists and `wipe`), and **`wipe` leaves static rows and rewinds `id_seq`** (slice 1
       semantics, consumed unchanged). A `PATCH`/`PUT`/`DELETE` of a static-origin row **mutates it** (D2: API writes ARE mutations; slice 1's CRUD semantics stand) — assert the mutation is allowed and that no *other* slice-2 path writes `static`; the `OPEN-D2` placeholder is dropped (D2 resolved). **Also in this change (spec-first, D2):** amend `spec.md` FR-002/SC-003 to scope the immutability guarantee to the layers that own the rows (naming the API-write path explicitly), and add an **A4 amendment** recording the decision and its *Why* (constitution Governance). **NC**:
       temporarily route a generation insert with `origin='static'`; the test must fail.
-- [ ] T044 [P] [US1] Test that **selecting by tag works end to end for fixtures** (D1, FR-002):
+- [X] T044 [P] [US1] Test that **selecting by tag works end to end for fixtures** (D1, FR-002):
       a project on `tags-api.yaml` selecting `Market_Orders` loads fixtures for the collections
       those operations derive, with no `operationId` available. Fails first, passes with T017.
-- [ ] T045 [US1] Make T041, T043, T044 pass; record the byte-comparison output for the PR.
+- [X] T045 [US1] Make T041, T043, T044 pass; record the byte-comparison output for the PR.
 
 **Checkpoint**: fixtures are applied identically forever and never touched (US1, SC-003 for the
 fixture layer).
@@ -826,3 +826,13 @@ nowhere.
   keeps that surface: a generated collection larger than the page lists as pages reached by the
   cursor, and the report states the style. It does **not** add a wrapper response carrying
   `nextPageToken` for the five wrapper schemas — that would be new mocked-surface behaviour.
+- **T042 — fixture sync rules.** Unchanged rows are left byte-for-byte alone (so a restart on the
+  same store keeps their timestamps); a changed row is updated with the run's clock instant and its
+  original `created_at`; a static row the files no longer declare is removed; a fixture whose
+  identity is already held by a non-static record refuses (`IdentityRangeOverlapError`). A link
+  from a fixture row to a parent that no fixture declares and the store does not hold refuses before
+  anything is written, naming file, entity, identity and `rows[i].field`. `Store.update` gained an
+  optional explicit `updated_at` so the clock seam (not the wall clock) stamps static rows.
+- **T043 — D2 delivered.** `spec.md` FR-002/SC-003 amended and A4 recorded (spec-first, in this
+  change); the `OPEN-D2` placeholder dropped; the structural test asserts exactly one source file
+  writes `origin: "static"`.

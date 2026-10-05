@@ -88,3 +88,21 @@ export async function allOperations(specPath: string): Promise<string[]> {
   const loaded = await loadSpec(specPath);
   return collectOperations(loaded.document).map((o) => `${o.method} ${o.path}`);
 }
+
+import { readdirSync, readFileSync as readText } from "node:fs";
+
+/** The text of every file under a project directory (relative path -> text), for copying/hashing. */
+export function readTree(dir: string, base = dir): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = joinPath(dir, entry.name);
+    if (entry.isDirectory()) Object.assign(out, readTree(full, base));
+    else out[full.slice(base.length + 1)] = readText(full, "utf8");
+  }
+  return out;
+}
+
+/** The layer files of a checked-in fixtures project, ready for `startProject`. */
+export function fixturesProject(name: string): Record<string, string> {
+  return readTree(fixturePath(name));
+}

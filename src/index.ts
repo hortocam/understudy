@@ -26,6 +26,7 @@ import { loadRecipes, selectRecipe } from "./config/layers/recipes.js";
 import { ConfigRefusedError, type Refusal } from "./errors.js";
 import { createClock } from "./clock.js";
 import { buildGenerationPlan } from "./data/plan.js";
+import { applyFixtures } from "./data/fixtures.js";
 import { indexReasons } from "./spec/report.js";
 import { effectiveSeed } from "./config/load.js";
 import { reconcile } from "./config/reconcile.js";
@@ -155,6 +156,29 @@ export async function createMock(
       });
     }
     store.setMeta("spec_hash", spec.contentHash);
+    store.setMeta("seed", String(seed));
+    store.setMeta("clock_mode", clock.mode);
+
+    // 5b. Fixtures (FR-002): make the store's `static` rows equal the files, in one transaction.
+    // Time comes from the clock seam, read once for this run (D8).
+    const run = clock.startRun();
+    const fixtureSummary = applyFixtures({
+      store,
+      fixtures,
+      resources: model.resources,
+      order: plan.order,
+      links: plan.links,
+      instant: run.now().toISOString(),
+    });
+    for (const table of fixtureSummary.lookupOnly) {
+      model.ambiguities.push({
+        kind: "lookup-only",
+        subject: table,
+        detail: `${table} is a lookup table that names no collection of the live operations: it is held in memory for 'lookup:' rules and is neither stored nor served`,
+      });
+    }
+    report.ambiguities.push(...model.ambiguities.filter((a) => a.kind === "lookup-only" && !report.ambiguities.includes(a)));
+    report.origins = store.countByOrigin();
 
     // 6. Serve the mocked surface and the control plane. Only after 1–5 have succeeded does
     // anything bind.

@@ -83,6 +83,9 @@ class CountingStore implements Store {
     this.inner.ensureResource(resource, options);
   }
   // Slice-2 seam additions: pure delegation (the counting is about reads of record bodies).
+  transaction<T>(fn: () => T): T {
+    return this.inner.transaction(fn);
+  }
   insertMany(records: NewRecord[]): void {
     this.inner.insertMany(records);
   }
@@ -120,8 +123,8 @@ class CountingStore implements Store {
     if (query) this.counts.queries.push(query);
     return this.#account(this.inner.listPaged(resource, query));
   }
-  update(resource: string, identity: string, data: unknown): StoredRecord | undefined {
-    return this.inner.update(resource, identity, data);
+  update(resource: string, identity: string, data: unknown, at?: string): StoredRecord | undefined {
+    return this.inner.update(resource, identity, data, at);
   }
   delete(resource: string, identity: string): boolean {
     return this.inner.delete(resource, identity);

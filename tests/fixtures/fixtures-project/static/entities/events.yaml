@@ -1,0 +1,4 @@
+entity: Event
+rows:
+  - { id: 1, name: "Opening Night", venueId: 1, category: music, startsAt: "2026-03-01T19:00:00Z" }
+  - { id: 2, name: "Derby Day", venueId: 2, category: sport, startsAt: "2026-04-11T13:30:00Z" }
