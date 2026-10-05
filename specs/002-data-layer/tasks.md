@@ -279,7 +279,7 @@ later phase consumes the model. **Golden family: inference.**
 and hide others; the report names collections, evidence, undetermined links with candidates,
 cycles, spaces and paging; pinning one in configuration changes the outcome.
 
-- [ ] T029 [P] [US4] Fixture documents (no vendor text; **shape-faithful to the measured
+- [X] T029 [P] [US4] Fixture documents (no vendor text; **shape-faithful to the measured
       facts**, `docs/05` §1): `tests/fixtures/collisions-api.yaml` (`externalId` on ≥4
       collections each meaning a different system; `eventId` + `viagogoEventId` +
       `primaryEventId` co-located on one resource; one unambiguous `venueId` → `Venue`),
@@ -288,24 +288,24 @@ cycles, spaces and paging; pinning one in configuration changes the outcome.
       `tests/fixtures/cursor-schema-api.yaml` (`paginationToken` in the response schema +
       `maxPageSize` query, plus an offset/limit and a page/size collection so all three styles
       are covered, and one collection declaring none).
-- [ ] T030 [P] [US4] **Inference golden test** in `tests/unit/inference.golden.test.ts`, written
+- [X] T030 [P] [US4] **Inference golden test** in `tests/unit/inference.golden.test.ts`, written
       before any derivation change: derive each fixture and compare the whole `{resources,
       relationships, ambiguities, plan}` serialisation to
       `tests/fixtures/golden/inference-<fixture>.json`. Goldens are authored by hand from the
       spec's rules (not captured from the code) and reviewed in the diff. Fails first on
       `status`/`candidates`/`idSpace`/`pagingStyle`.
-- [ ] T031 [US4] Extend the derived model types in `src/spec/types.ts` (data-model §1):
+- [X] T031 [US4] Extend the derived model types in `src/spec/types.ts` (data-model §1):
       `Resource.idSpace` (`integer|uuid|formatted|opaque`), `Resource.pagingStyle`
       (`cursor-in-schema|offset-limit|page-size|none-declared`), `Resource.filterFields /
       sortFields`, `Relationship.status` (`decided|undetermined`) and `candidates`, new
       `AmbiguityKind`s (`undetermined-link`, `identity-space-unreservable`,
       `paging-not-exercised`, `unpaged-large-collection`, `clock-unpinned`,
       `lookup-only`). Additive: slice 1 consumers still compile.
-- [ ] T032 [US4] Implement identity-space classification in `src/spec/resources.ts` (declared
+- [X] T032 [US4] Implement identity-space classification in `src/spec/resources.ts` (declared
       type+format+pattern → space; opaque string ⇒ `identity-space-unreservable` reported,
       **never guessed**) and paging-style classification (query parameters **and** the 2xx
       response schema's cursor property).
-- [ ] T033 [US4] Implement **convention proposes / decides only when unambiguous** (FR-006
+- [X] T033 [US4] Implement **convention proposes / decides only when unambiguous** (FR-006
       amendment B): a convention hit is *proposed*; it is `decided` iff exactly one candidate
       survives; `externalId`-class names (a name occurring on several collections with no
       distinguishing prefix, configurable list) and two sibling properties that could both be
@@ -314,30 +314,30 @@ cycles, spaces and paging; pinning one in configuration changes the outcome.
       wins over every inferred one and is reported `configured`; an `extension`
       (`x-understudy-ref`, documented in the contract) outranks convention; nesting last.
       Evidence order is asserted by a table test, one row per rung.
-- [ ] T034 [P] [US4] Test for the **generation plan** in `tests/unit/plan.test.ts`: `order` is a
+- [X] T034 [P] [US4] Test for the **generation plan** in `tests/unit/plan.test.ts`: `order` is a
       topological order over **decided** links only; ties break by collection **name** (never
       recipe order or object-key order — SC-007); a cycle yields `cycles: [[A,B,C]]`, the
       acyclic part still orders, cycle members are ordered deterministically and their cyclic
       link fields are listed as unresolved-and-reported (FR-008); `refusals` is non-empty for
       overlapping ranges / unknown collections. **Run on a 10 000-edge synthetic graph with a
       long chain — no recursion, no stack overflow (research §6).** Fails first.
-- [ ] T035 [US4] Implement `src/data/plan.ts` (`GenerationPlan` per data-model §1: `order`,
+- [X] T035 [US4] Implement `src/data/plan.ts` (`GenerationPlan` per data-model §1: `order`,
       `cycles` (Tarjan SCC, iterative), `perCollection[] {name, seed, count, idRange,
       fieldRules[]}`, `refusals`) — pure, no store.
-- [ ] T036 [P] [US4] Test the **report** in `tests/unit/report.test.ts` (extend; slice 1's
+- [X] T036 [P] [US4] Test the **report** in `tests/unit/report.test.ts` (extend; slice 1's
       assertions untouched): collections with `idSpace`, `pagingStyle` and range; every link
       with evidence; `undetermined` links listed **separately with candidates**; cycles; the
       generation order; configured counts; counts by origin; the clock mode and `clock-unpinned`
       warning; a `configured` link renders differently from a `convention` one; the **same data**
       feeds the human rendering and the structured log line. Fails first.
-- [ ] T037 [US4] Extend `src/spec/report.ts` and `src/logging.ts` for the above. `spec/` still
+- [X] T037 [US4] Extend `src/spec/report.ts` and `src/logging.ts` for the above. `spec/` still
       imports nothing from `data/`: the plan is attached to the report by `src/index.ts`.
-- [ ] T038 [P] [US4] Integration test `tests/integration/inference-startup.test.ts` — Scenario
+- [X] T038 [P] [US4] Integration test `tests/integration/inference-startup.test.ts` — Scenario
       5 and US4.1–5: start the real mock on `collisions-api.yaml`; the report lists the
       undetermined links with candidates; a `configured` pin in `understudy.yaml` flips one to
       `decided`/`configured`; a cycle document starts and **does not deadlock** (assert it
       reaches `listening` inside a timeout). Fails first.
-- [ ] T039 [US4] Wire the plan into `createMock` (`src/index.ts`): build `GenerationPlan`
+- [X] T039 [US4] Wire the plan into `createMock` (`src/index.ts`): build `GenerationPlan`
       after reconcile, **refuse on any `refusals`**, attach to `StartupReport`, log both
       renderings. T038 goes green.
 
@@ -802,3 +802,27 @@ nowhere.
   `defer_foreign_keys`, so a restrict link passes when parent and children go together.
 - **T022 — slice 1's `CountingStore` (large-collection test)** gained pure-delegation methods for
   the additive seam so the typecheck stays green; its assertions are untouched.
+- **T032/T033 — derivation rules fixed here.** A property proposes a link when its word-tokens
+  (camel/snake split) end with an entity's tokens plus an id suffix, or equal the entity name
+  (`viagogoEventId` proposes Event); the longest entity match wins, a tie is *undetermined*; an
+  integer property cannot reference a string identity. Two or more sibling properties proposing
+  the same target are all *undetermined* with each other as `candidates`. `ambiguousNames`
+  (default `externalId, referenceId, refId, parentId`) are never decided. A configured pin or a
+  declared `x-understudy-relationships` extension resolves a tie: the competing undetermined
+  siblings to the same target (or on the same field) disappear. `sortFields` come from a sort
+  parameter's declared `enum` (a generic `sort` string declares none); indexes exist for filter
+  parameters and those enum fields that are declared properties.
+- **T035 — FKs only for `one` links.** An array-valued link (`cardinality: many`) still orders
+  generation but cannot be a foreign-key column, so it gets none.
+- **T039 — API writes and the new constraints (new surface consequence, flagged).** Real foreign
+  keys mean `POST`/`PATCH` naming a missing parent and `DELETE` of a still-referenced parent
+  now fail at the store. The mock renders them as the document's *declared* client error
+  (400 / 409, else the first declared 4xx, never a bare 500) via a store-level
+  `ReferenceViolationError`. This is slice 1 CRUD semantics made consistent with `restrict`, not
+  new endpoints; it is called out in the PR.
+- **FR-015 and the response envelope (finding for the owner).** Slice 1's list serves bare arrays
+  and honours the client-supplied cursor (the identity of the last record seen) — the target's
+  paging is query-parameter driven (`docs/05` §1: "not a uniform response envelope"). Slice 2
+  keeps that surface: a generated collection larger than the page lists as pages reached by the
+  cursor, and the report states the style. It does **not** add a wrapper response carrying
+  `nextPageToken` for the five wrapper schemas — that would be new mocked-surface behaviour.

@@ -96,6 +96,13 @@ export interface UnderstudyConfig {
   seed: number;
   entities: Record<string, EntityConfig>;
   inference: InferenceConfig;
+  /** `ustdy up --seed`: overrides the recipe's and the configuration's seed. Not a file key. */
+  seedOverride?: number;
+}
+
+/** The seed in force: `--seed`, else the recipe's, else the configuration's (default 0). */
+export function effectiveSeed(config: Pick<UnderstudyConfig, "seed" | "seedOverride">, recipe?: { seed?: number }): number {
+  return config.seedOverride ?? recipe?.seed ?? config.seed;
 }
 
 const DEFAULT_SERVER: ServerConfig = { port: 8080, host: "127.0.0.1", basePath: "" };

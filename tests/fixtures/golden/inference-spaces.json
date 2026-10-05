@@ -1,0 +1,56 @@
+{
+  "resources": [
+    {
+      "name": "BigInt",
+      "idField": "id",
+      "idType": "integer",
+      "idSpace": "integer",
+      "pagingStyle": "offset-limit",
+      "filterFields": [],
+      "sortFields": []
+    },
+    {
+      "name": "Formatted",
+      "idField": "id",
+      "idType": "string",
+      "idSpace": "formatted",
+      "pagingStyle": "offset-limit",
+      "filterFields": [],
+      "sortFields": []
+    },
+    {
+      "name": "Opaque",
+      "idField": "id",
+      "idType": "string",
+      "idSpace": "opaque",
+      "pagingStyle": "offset-limit",
+      "filterFields": [],
+      "sortFields": []
+    },
+    {
+      "name": "SmallInt",
+      "idField": "id",
+      "idType": "integer",
+      "idSpace": "integer",
+      "pagingStyle": "offset-limit",
+      "filterFields": [],
+      "sortFields": []
+    },
+    {
+      "name": "UuidThing",
+      "idField": "id",
+      "idType": "string",
+      "idSpace": "uuid",
+      "pagingStyle": "offset-limit",
+      "filterFields": [],
+      "sortFields": []
+    }
+  ],
+  "relationships": [],
+  "ambiguities": [
+    {
+      "kind": "identity-space-unreservable",
+      "subject": "Opaque"
+    }
+  ]
+}

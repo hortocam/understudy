@@ -195,7 +195,7 @@ export function buildProgram(io: CliIo): Command {
         config = { ...config, operations: resolveSelection(options, io.env, config) };
         // Slice 2: the start-time recipe and seed override the file's, the same way.
         if (options.recipe !== undefined) config = { ...config, recipe: options.recipe };
-        if (options.seed !== undefined) config = { ...config, seed: options.seed };
+        if (options.seed !== undefined) config = { ...config, seedOverride: options.seed };
 
         let mock;
         try {

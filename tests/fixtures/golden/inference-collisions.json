@@ -1,0 +1,175 @@
+{
+  "resources": [
+    {
+      "name": "Customer",
+      "idField": "id",
+      "idType": "integer",
+      "idSpace": "integer",
+      "pagingStyle": "offset-limit",
+      "filterFields": [],
+      "sortFields": []
+    },
+    {
+      "name": "Event",
+      "idField": "id",
+      "idType": "integer",
+      "idSpace": "integer",
+      "pagingStyle": "offset-limit",
+      "filterFields": [],
+      "sortFields": []
+    },
+    {
+      "name": "Listing",
+      "idField": "id",
+      "idType": "integer",
+      "idSpace": "integer",
+      "pagingStyle": "offset-limit",
+      "filterFields": [],
+      "sortFields": []
+    },
+    {
+      "name": "Order",
+      "idField": "id",
+      "idType": "integer",
+      "idSpace": "integer",
+      "pagingStyle": "offset-limit",
+      "filterFields": [],
+      "sortFields": []
+    },
+    {
+      "name": "Venue",
+      "idField": "id",
+      "idType": "integer",
+      "idSpace": "integer",
+      "pagingStyle": "offset-limit",
+      "filterFields": [],
+      "sortFields": []
+    }
+  ],
+  "relationships": [
+    {
+      "from": "Customer",
+      "to": "",
+      "field": "externalId",
+      "evidence": "convention",
+      "status": "undetermined",
+      "candidates": []
+    },
+    {
+      "from": "Event",
+      "to": "",
+      "field": "externalId",
+      "evidence": "convention",
+      "status": "undetermined",
+      "candidates": []
+    },
+    {
+      "from": "Event",
+      "to": "Venue",
+      "field": "venueId",
+      "evidence": "convention",
+      "status": "decided"
+    },
+    {
+      "from": "Listing",
+      "to": "",
+      "field": "externalId",
+      "evidence": "convention",
+      "status": "undetermined",
+      "candidates": []
+    },
+    {
+      "from": "Listing",
+      "to": "Order",
+      "field": "orderId",
+      "evidence": "convention",
+      "status": "decided"
+    },
+    {
+      "from": "Listing",
+      "to": "",
+      "field": "referenceId",
+      "evidence": "convention",
+      "status": "undetermined",
+      "candidates": []
+    },
+    {
+      "from": "Order",
+      "to": "Event",
+      "field": "eventId",
+      "evidence": "convention",
+      "status": "undetermined",
+      "candidates": [
+        "eventId",
+        "primaryEventId",
+        "viagogoEventId"
+      ]
+    },
+    {
+      "from": "Order",
+      "to": "",
+      "field": "externalId",
+      "evidence": "convention",
+      "status": "undetermined",
+      "candidates": []
+    },
+    {
+      "from": "Order",
+      "to": "Event",
+      "field": "primaryEventId",
+      "evidence": "convention",
+      "status": "undetermined",
+      "candidates": [
+        "eventId",
+        "primaryEventId",
+        "viagogoEventId"
+      ]
+    },
+    {
+      "from": "Order",
+      "to": "Event",
+      "field": "viagogoEventId",
+      "evidence": "convention",
+      "status": "undetermined",
+      "candidates": [
+        "eventId",
+        "primaryEventId",
+        "viagogoEventId"
+      ]
+    }
+  ],
+  "ambiguities": [
+    {
+      "kind": "undetermined-link",
+      "subject": "Customer.externalId"
+    },
+    {
+      "kind": "undetermined-link",
+      "subject": "Event.externalId"
+    },
+    {
+      "kind": "undetermined-link",
+      "subject": "Listing.externalId"
+    },
+    {
+      "kind": "undetermined-link",
+      "subject": "Listing.referenceId"
+    },
+    {
+      "kind": "undetermined-link",
+      "subject": "Order.eventId"
+    },
+    {
+      "kind": "undetermined-link",
+      "subject": "Order.externalId"
+    },
+    {
+      "kind": "undetermined-link",
+      "subject": "Order.primaryEventId"
+    },
+    {
+      "kind": "undetermined-link",
+      "subject": "Order.viagogoEventId"
+    }
+  ]
+}

@@ -80,3 +80,11 @@ export async function startProject(
   });
   return { dir, mock };
 }
+
+/** Every `METHOD /path` a fixture document declares, for a project that makes it all live. */
+export async function allOperations(specPath: string): Promise<string[]> {
+  const { loadSpec } = await import("../../src/spec/load.js");
+  const { collectOperations } = await import("../../src/spec/operations.js");
+  const loaded = await loadSpec(specPath);
+  return collectOperations(loaded.document).map((o) => `${o.method} ${o.path}`);
+}

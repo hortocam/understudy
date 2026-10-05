@@ -55,7 +55,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Venue"
+                "$ref": "#/components/schemas/VenueInput"
               }
             }
           }
@@ -113,7 +113,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Venue"
+                "$ref": "#/components/schemas/VenueInput"
               }
             }
           }
@@ -131,6 +131,9 @@
           },
           "404": {
             "description": "nf"
+          },
+          "400": {
+            "description": "bad reference"
           }
         }
       },
@@ -142,6 +145,9 @@
           },
           "404": {
             "description": "nf"
+          },
+          "409": {
+            "description": "conflict: still referenced"
           }
         }
       }
@@ -202,7 +208,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Event"
+                "$ref": "#/components/schemas/EventInput"
               }
             }
           }
@@ -260,7 +266,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Event"
+                "$ref": "#/components/schemas/EventInput"
               }
             }
           }
@@ -278,6 +284,9 @@
           },
           "404": {
             "description": "nf"
+          },
+          "400": {
+            "description": "bad reference"
           }
         }
       },
@@ -289,6 +298,9 @@
           },
           "404": {
             "description": "nf"
+          },
+          "409": {
+            "description": "conflict: still referenced"
           }
         }
       }
@@ -349,7 +361,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Inventory"
+                "$ref": "#/components/schemas/InventoryInput"
               }
             }
           }
@@ -407,7 +419,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Inventory"
+                "$ref": "#/components/schemas/InventoryInput"
               }
             }
           }
@@ -425,6 +437,9 @@
           },
           "404": {
             "description": "nf"
+          },
+          "400": {
+            "description": "bad reference"
           }
         }
       },
@@ -436,6 +451,9 @@
           },
           "404": {
             "description": "nf"
+          },
+          "409": {
+            "description": "conflict: still referenced"
           }
         }
       }
@@ -467,7 +485,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/InventoryStatus"
+                "$ref": "#/components/schemas/InventoryStatusInput"
               }
             }
           }
@@ -525,7 +543,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/InventoryStatus"
+                "$ref": "#/components/schemas/InventoryStatusInput"
               }
             }
           }
@@ -543,6 +561,9 @@
           },
           "404": {
             "description": "nf"
+          },
+          "400": {
+            "description": "bad reference"
           }
         }
       },
@@ -554,6 +575,9 @@
           },
           "404": {
             "description": "nf"
+          },
+          "409": {
+            "description": "conflict: still referenced"
           }
         }
       }
@@ -607,7 +631,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AuditNote"
+                "$ref": "#/components/schemas/AuditNoteInput"
               }
             }
           }
@@ -665,7 +689,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AuditNote"
+                "$ref": "#/components/schemas/AuditNoteInput"
               }
             }
           }
@@ -683,6 +707,9 @@
           },
           "404": {
             "description": "nf"
+          },
+          "400": {
+            "description": "bad reference"
           }
         }
       },
@@ -694,6 +721,9 @@
           },
           "404": {
             "description": "nf"
+          },
+          "409": {
+            "description": "conflict: still referenced"
           }
         }
       }
@@ -853,6 +883,144 @@
             "type": "string"
           }
         }
+      },
+      "VenueInput": {
+        "title": "VenueInput",
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 40
+          },
+          "city": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "MA",
+              "NY",
+              "CA"
+            ]
+          },
+          "timezone": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "EventInput": {
+        "title": "EventInput",
+        "type": "object",
+        "required": [
+          "name",
+          "venueId"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 3
+          },
+          "venueId": {
+            "type": "integer"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "music",
+              "sport",
+              "theatre"
+            ]
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "contactEmail": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        "additionalProperties": true
+      },
+      "InventoryInput": {
+        "title": "InventoryInput",
+        "type": "object",
+        "required": [
+          "eventId",
+          "quantity"
+        ],
+        "properties": {
+          "eventId": {
+            "type": "integer"
+          },
+          "statusId": {
+            "type": "integer"
+          },
+          "section": {
+            "type": "string"
+          },
+          "row": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "cost": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "price": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 2000
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "InventoryStatusInput": {
+        "title": "InventoryStatusInput",
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "AuditNoteInput": {
+        "title": "AuditNoteInput",
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "externalId": {
+            "type": "string"
+          },
+          "referenceId": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
       }
     }
   }

@@ -1,0 +1,102 @@
+{
+  "resources": [
+    {
+      "name": "Alpha",
+      "idField": "id",
+      "idType": "integer",
+      "idSpace": "integer",
+      "pagingStyle": "offset-limit",
+      "filterFields": [],
+      "sortFields": []
+    },
+    {
+      "name": "Beta",
+      "idField": "id",
+      "idType": "integer",
+      "idSpace": "integer",
+      "pagingStyle": "offset-limit",
+      "filterFields": [],
+      "sortFields": []
+    },
+    {
+      "name": "Delta",
+      "idField": "id",
+      "idType": "integer",
+      "idSpace": "integer",
+      "pagingStyle": "offset-limit",
+      "filterFields": [],
+      "sortFields": []
+    },
+    {
+      "name": "Gamma",
+      "idField": "id",
+      "idType": "integer",
+      "idSpace": "integer",
+      "pagingStyle": "offset-limit",
+      "filterFields": [],
+      "sortFields": []
+    },
+    {
+      "name": "Omega",
+      "idField": "id",
+      "idType": "integer",
+      "idSpace": "integer",
+      "pagingStyle": "offset-limit",
+      "filterFields": [],
+      "sortFields": []
+    }
+  ],
+  "relationships": [
+    {
+      "from": "Alpha",
+      "to": "Beta",
+      "field": "betaId",
+      "evidence": "convention",
+      "status": "decided"
+    },
+    {
+      "from": "Beta",
+      "to": "Gamma",
+      "field": "gammaId",
+      "evidence": "convention",
+      "status": "decided"
+    },
+    {
+      "from": "Delta",
+      "to": "Alpha",
+      "field": "alphaId",
+      "evidence": "convention",
+      "status": "decided"
+    },
+    {
+      "from": "Gamma",
+      "to": "Alpha",
+      "field": "alphaId",
+      "evidence": "convention",
+      "status": "decided"
+    }
+  ],
+  "ambiguities": [],
+  "plan": {
+    "order": [
+      "Alpha",
+      "Beta",
+      "Gamma",
+      "Delta",
+      "Omega"
+    ],
+    "cycles": [
+      {
+        "members": [
+          "Alpha",
+          "Beta",
+          "Gamma"
+        ],
+        "unresolved": [
+          "Alpha.betaId",
+          "Beta.gammaId"
+        ]
+      }
+    ]
+  }
+}

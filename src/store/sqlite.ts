@@ -10,7 +10,18 @@ import { dirname } from "node:path";
 import Database from "better-sqlite3";
 import { createHash } from "node:crypto";
 import { StoreSchemaConflictError, StoreUnwritableError } from "../errors.js";
-import type { IdRange, ListQuery, NewRecord, Origin, RequestLogEntry, ResourceOptions, Store, StoreOptions, StoredRecord } from "./index.js";
+import {
+  ReferenceViolationError,
+  type IdRange,
+  type ListQuery,
+  type NewRecord,
+  type Origin,
+  type RequestLogEntry,
+  type ResourceOptions,
+  type Store,
+  type StoreOptions,
+  type StoredRecord,
+} from "./index.js";
 import {
   ID_RANGES_DDL,
   ID_RANGES_TABLE,
@@ -48,6 +59,23 @@ interface RequestRow {
   status: number;
   live: number;
   duration_ms: number;
+}
+
+/** Re-throw a driver foreign-key failure as the seam's `ReferenceViolationError`. */
+function translate(error: unknown, resource: string, operation: "write" | "delete"): never {
+  // SQLite reports a missing parent as SQLITE_CONSTRAINT_FOREIGNKEY but a RESTRICT/deferred
+  // violation as SQLITE_CONSTRAINT_TRIGGER; the message is the same for both.
+  const code = (error as { code?: string } | undefined)?.code ?? "";
+  if (code.startsWith("SQLITE_CONSTRAINT") && /FOREIGN KEY constraint failed/.test(messageOf(error))) {
+    throw new ReferenceViolationError(
+      operation === "delete" ? "referenced" : "missing-parent",
+      resource,
+      operation === "delete"
+        ? `${resource} is referenced by other records`
+        : `${resource} references a record that does not exist`,
+    );
+  }
+  throw error;
 }
 
 function messageOf(error: unknown): string {
@@ -198,7 +226,11 @@ export class SqliteStore implements Store {
       this.#insertSql.set(record.resource, sql);
     }
     for (let i = 0; i < (spec?.foreignKeys.length ?? 0); i += 1) params.push(body);
-    this.#require().prepare(sql).run(...params);
+    try {
+      this.#require().prepare(sql).run(...params);
+    } catch (error) {
+      translate(error, record.resource, "write");
+    }
     return { ...record };
   }
 
@@ -387,19 +419,28 @@ export class SqliteStore implements Store {
       sql = `UPDATE ${quoteIdent(resource)} SET doc = ?, updated_at = ?${links} WHERE id = ?`;
       this.#updateSql.set(resource, sql);
     }
-    const result = this.#require()
-      .prepare(sql)
-      .run(body, at, ...foreignKeys.map(() => body), identity);
+    let result: Database.RunResult;
+    try {
+      result = this.#require()
+        .prepare(sql)
+        .run(body, at, ...foreignKeys.map(() => body), identity);
+    } catch (error) {
+      translate(error, resource, "write");
+    }
     if (result.changes === 0) return undefined;
     return this.readOne(resource, identity);
   }
 
   delete(resource: string, identity: string): boolean {
     this.ensureResource(resource);
-    const result = this.#require()
-      .prepare(`DELETE FROM ${quoteIdent(resource)} WHERE id = ?`)
-      .run(identity);
-    return result.changes > 0;
+    try {
+      const result = this.#require()
+        .prepare(`DELETE FROM ${quoteIdent(resource)} WHERE id = ?`)
+        .run(identity);
+      return result.changes > 0;
+    } catch (error) {
+      return translate(error, resource, "delete");
+    }
   }
 
   wipe(): void {

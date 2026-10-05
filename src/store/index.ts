@@ -57,6 +57,22 @@ export interface ListQuery {
   after?: string;
 }
 
+/**
+ * A write broke a foreign key: the record names a parent that does not exist
+ * (`missing-parent`), or a parent was deleted while children still reference it (`referenced`).
+ * The store translates its driver's constraint failure into this so no caller depends on SQL.
+ */
+export class ReferenceViolationError extends Error {
+  readonly kind: "missing-parent" | "referenced";
+  readonly resource: string;
+  constructor(kind: "missing-parent" | "referenced", resource: string, detail: string) {
+    super(`FOREIGN KEY constraint failed: ${detail}`);
+    this.name = "ReferenceViolationError";
+    this.kind = kind;
+    this.resource = resource;
+  }
+}
+
 /** A foreign key from a `decided` relationship (data-model.md §3). An undetermined link gets none. */
 export interface ForeignKeySpec {
   /** The child record's link property. */

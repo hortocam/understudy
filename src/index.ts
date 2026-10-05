@@ -23,7 +23,11 @@ import { loadBehavior } from "./config/layers/behavior.js";
 import { loadFixtures } from "./config/layers/fixtures.js";
 import { loadImportMappings } from "./config/layers/imports.js";
 import { loadRecipes, selectRecipe } from "./config/layers/recipes.js";
-import { ConfigRefusedError } from "./errors.js";
+import { ConfigRefusedError, type Refusal } from "./errors.js";
+import { createClock } from "./clock.js";
+import { buildGenerationPlan } from "./data/plan.js";
+import { indexReasons } from "./spec/report.js";
+import { effectiveSeed } from "./config/load.js";
 import { reconcile } from "./config/reconcile.js";
 import { BUILTIN_GENERATOR_NAMES, isFakerPath } from "./data/generators/names.js";
 import type { StartupReport } from "./spec/types.js";
@@ -87,7 +91,16 @@ export async function createMock(
     const selection = selectOperations(spec.document, config.operations);
 
     // 3. Derive the model from the live set (FR-023).
-    const model = deriveModel(spec.document, selection.live);
+    // Links pinned in configuration are the `configured` evidence rung (FR-006); the naming
+    // convention's rules are configurable (`inference`).
+    const configuredRelationships = Object.entries(config.entities).flatMap(([from, entity]) =>
+      Object.entries(entity.relations ?? {}).map(([field, relation]) => ({
+        from,
+        to: relation.to.split(".")[0] as string,
+        field,
+      })),
+    );
+    const model = deriveModel(spec.document, selection.live, { configuredRelationships, inference: config.inference });
 
     // 3b. Load the four configuration layers (FR-001) and reconcile them against the document
     // (FR-005): every cause is collected, so one refusal lists the whole problem. Nothing is
@@ -98,7 +111,7 @@ export async function createMock(
     const recipe = config.recipe === undefined ? undefined : selectRecipe(recipes, config.recipe);
     loadBehavior(config.paths.behavior, config.baseDir);
     loadImportMappings(config.paths.imports, config.baseDir);
-    const refusals = reconcile({
+    const refusals: Refusal[] = reconcile({
       config,
       model,
       fixtures,
@@ -106,8 +119,14 @@ export async function createMock(
       knownGenerators: BUILTIN_GENERATOR_NAMES,
       isFakerPath,
     });
+
+    // 3c. The plan: generation order over the decided links, cycles reported (FR-008/009), and
+    // every refusal it can already see. Nothing is written yet.
+    const plan = buildGenerationPlan({ model, ...(recipe ? { recipe } : {}), entities: config.entities });
+    refusals.push(...plan.refusals);
     if (refusals.length > 0) throw new ConfigRefusedError(refusals);
-    void recipe;
+    const clock = createClock(config.clock);
+    const seed = effectiveSeed(config, recipe);
 
     // 4. Build the report from all three (FR-023, FR-024).
     const report = buildStartupReport({
@@ -116,12 +135,25 @@ export async function createMock(
       notSelected: selection.notImplemented,
       model,
       selection,
+      clock,
+      seed,
+      plan,
+      ...(recipe ? { recipe: recipe.name } : {}),
     });
 
-    // 5. Open the store and create one table per derived resource (SC-002, data-model.md §2).
+    // 5. Open the store and create one table per derived resource, parents first, each with the
+    // real foreign keys of its DECIDED links and an index for every property the document
+    // declares filterable/sortable (SC-002, data-model.md §2–§3).
     const store = options.store ?? new SqliteStore({ path: config.storage.path });
     store.open();
-    for (const resource of model.resources) store.ensureResource(resource.name);
+    const indexed = new Map<string, string[]>();
+    for (const index of indexReasons(model)) indexed.set(index.resource, [...(indexed.get(index.resource) ?? []), index.field]);
+    for (const name of plan.order) {
+      store.ensureResource(name, {
+        foreignKeys: (plan.links[name] ?? []).map((link) => ({ field: link.field, references: link.to, onDelete: link.onDelete })),
+        indexes: indexed.get(name) ?? [],
+      });
+    }
     store.setMeta("spec_hash", spec.contentHash);
 
     // 6. Serve the mocked surface and the control plane. Only after 1–5 have succeeded does
