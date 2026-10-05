@@ -179,15 +179,15 @@ create a record, restart the process, read it back; call a non-selected operatio
 **Independent Test**: run `quickstart.md` §8 end to end, and with the control plane stopped,
 confirm each command reports a connection failure instead of doing the work locally.
 
-- [ ] T034 [P] [US3] Integration test in `tests/integration/cli.test.ts`: each command's output
+- [X] T034 [P] [US3] Integration test in `tests/integration/cli.test.ts`: each command's output
       agrees with the corresponding control-API response; `ops list` mirrors `/operations`;
       `reset --to wipe` mirrors `POST /reset`; `down` mirrors `/teardown`; with the control plane
       down, each command exits non-zero with a connection error (SC-005, FR-019/FR-020). Fails first.
-- [ ] T035 [US3] Implement `src/cli/client.ts`: a thin HTTP client for the five control operations,
+- [X] T035 [US3] Implement `src/cli/client.ts`: a thin HTTP client for the five control operations,
       with the base URL from `--control-url`/env, and a clear connection-failure message.
-- [ ] T036 [US3] Implement `src/cli/index.ts` with commander: `up`, `down`, `ops list`,
+- [X] T036 [US3] Implement `src/cli/index.ts` with commander: `up`, `down`, `ops list`,
       `reset`, `logs requests`, each formatting a control response and nothing more.
-- [ ] T037 [US3] Implement `up`'s one non-client act — construct the server from the config and
+- [X] T037 [US3] Implement `up`'s one non-client act — construct the server from the config and
       poll `/health` until ready — keeping every other command purely a client (FR-019).
 
 **Checkpoint**: the tool is pleasant in a terminal and in CI.
