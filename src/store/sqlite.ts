@@ -13,6 +13,7 @@ import type { ListQuery, Origin, RequestLogEntry, Store, StoreOptions, StoredRec
 import {
   META_DDL,
   META_TABLE,
+  META_TABLES,
   ORIGIN_CHECK,
   REQUESTS_DDL,
   REQUESTS_TABLE,
@@ -278,14 +279,21 @@ export class SqliteStore implements Store {
     return value;
   }
 
-  /** Tables that hold resource records (excludes the `_`-prefixed metadata tables). */
+  /**
+   * Tables that hold resource records.
+   *
+   * The tool's own metadata tables are excluded by *exact name* (`META_TABLES`), never by a
+   * `_`-prefix: a derived resource's table name comes from a collection path segment that may
+   * legitimately begin with `_`, and excluding by prefix silently dropped such a table out of
+   * the unscoped wipe and `removeByOrigin` (HANDOFF-p5-p7 §5 item 4, SC-002). A table created
+   * by a future schema version is still a resource table, so it is wiped too rather than
+   * leaked.
+   */
   #resourceTables(): string[] {
     const rows = this.#require()
-      .prepare(
-        `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '\\_%' ESCAPE '\\'`,
-      )
+      .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\'`)
       .all() as { name: string }[];
-    return rows.map((row) => row.name);
+    return rows.map((row) => row.name).filter((name) => !META_TABLES.has(name));
   }
 }
 
