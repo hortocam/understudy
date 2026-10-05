@@ -328,6 +328,8 @@ export async function createMock(
       resources: model.resources,
       idsStart: config.ids.generatedStart,
       idStarts,
+      generate: runGeneration,
+      clock: { mode: clock.mode, pinned: clock.pinned },
       openapiBytes: controlApiBytes,
       onTeardown: () => {
         close().catch((error: unknown) => {

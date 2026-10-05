@@ -31,7 +31,8 @@ export type ErrorCode =
   | "GENERATION_MARKER_MISMATCH"
   | "FIXTURE_NONCONFORMING"
   | "GENERATION_REFUSED"
-  | "STORE_SCHEMA_CONFLICT";
+  | "STORE_SCHEMA_CONFLICT"
+  | "INIT_CONFLICT";
 
 function describe(value: unknown): string {
   if (typeof value === "string") return value;
@@ -260,5 +261,17 @@ export class AmbiguousSelectionError extends UnderstudyError {
 export class StoreSchemaConflictError extends UnderstudyError {
   constructor(resource: string, detail: string) {
     super("STORE_SCHEMA_CONFLICT", `cannot change the stored shape of ${resource}: ${detail}`, resource);
+  }
+}
+
+
+/** `ustdy init` would overwrite files that already exist. */
+export class InitConflictError extends UnderstudyError {
+  constructor(files: string[]) {
+    super(
+      "INIT_CONFLICT",
+      `init would overwrite existing files: ${files.join(", ")}; move them aside or pass --force to replace them`,
+      files[0],
+    );
   }
 }

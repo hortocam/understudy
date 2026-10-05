@@ -580,25 +580,25 @@ correctly linked mock (SC-001, SC-004).
 **Goal**: the generation operation lives in the control API; the CLI is a client of it.
 (`init` is the documented non-client act, with **no generation logic**, plan Constitution Check II.)
 
-- [ ] T073 [P] [US2] Control-API test in `tests/integration/control-generate.test.ts` (extends
+- [X] T073 [P] [US2] Control-API test in `tests/integration/control-generate.test.ts` (extends
       slice 1's, untouched): `POST /generate {recipe, seed?}` returns the declared
       `GenerateResult` with **counts by collection and origin** (FR-021, FR-004); the response
       validates against `contracts/control-api.openapi.json` (T006); an unknown recipe returns
       the declared 4xx `ControlError` naming it; a malformed body returns the declared 400; the
       request is **not** routed into the mocked surface; a second identical call follows D7
       (no-op, said so). Fails first.
-- [ ] T074 [US2] Implement the route in `src/control/routes.ts` over `src/data/generate.ts`
+- [X] T074 [US2] Implement the route in `src/control/routes.ts` over `src/data/generate.ts`
       (the control plane gains a `generate` dependency through `ControlContext`, nothing
       else). T073 green.
-- [ ] T075 [P] [US2] CLI tests in `tests/integration/cli.test.ts` (extend): `ustdy generate
+- [X] T075 [P] [US2] CLI tests in `tests/integration/cli.test.ts` (extend): `ustdy generate
       --recipe <n> [--seed <n>]` output agrees with the control response; with the control plane
       down it exits non-zero with a connection error and **does no local work** (FR-019/020 of
       slice 1, still binding); `up --recipe/--seed` start-time generation; the architecture
       test (T002) still passes (the CLI imports nothing from `data/`). Fails first.
-- [ ] T076 [US2] Implement `generate` in `src/cli/client.ts` + `src/cli/program.ts` and the
+- [X] T076 [US2] Implement `generate` in `src/cli/client.ts` + `src/cli/program.ts` and the
       extended `specs/002-data-layer/contracts/cli.md` (every new flag documented with a runnable
       example — constitution IX).
-- [ ] T077 [P] [US4] Test for **`ustdy init`** (FR-020, Scenario 1) in
+- [X] T077 [P] [US4] Test for **`ustdy init`** (FR-020, Scenario 1) in
       `tests/integration/init.test.ts`: against `inventory-api.yaml` the four layer folders
       (`static/{lookups,entities}`, `imports`, `dynamic`, `behavior`) and an `understudy.yaml`
       exist; **stdout is the inferred collection report** (collections, links with evidence,
@@ -606,7 +606,7 @@ correctly linked mock (SC-001, SC-004).
       (naming them) unless `--force`; the scaffolded project **starts** (`ustdy up` on it
       succeeds); the CLI module imports only `src/index.ts`/`src/init.ts`; no network beyond a
       URL the user supplied. Fails first.
-- [ ] T078 [US4] Implement `src/init.ts` (library) and the `init` command: derive via the
+- [X] T078 [US4] Implement `src/init.ts` (library) and the `init` command: derive via the
       existing pipeline, write commented scaffolds whose example content is the **documented
       examples** from the contract, print the report. Contains no generation logic.
 
