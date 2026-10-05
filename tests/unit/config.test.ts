@@ -92,6 +92,23 @@ describe("loadConfig refusals", () => {
     expect(error).toBeInstanceOf(ConfigInvalidError);
     expect((error as Error).message).toContain("spec");
   });
+
+  it("accepts an operationId that is not an identifier shape (T048: hyphens and dots)", () => {
+    // OpenAPI constrains operationId only as a unique string; real documents use hyphens and
+    // dots. The contract must not refuse them before the document is even consulted.
+    for (const entry of ["get-widgets", "api.getWidgets"]) {
+      const config = parseConfig(`spec: ./api.yaml\noperations: [${entry}]\n`, "c.yaml");
+      expect(config.operations).toEqual([entry]);
+    }
+  });
+
+  it("accepts a METHOD /path entry containing a hyphen or dot in the path", () => {
+    const config = parseConfig(
+      'spec: ./api.yaml\noperations: ["GET /v1.2/foo-bar"]\n',
+      "c.yaml",
+    );
+    expect(config.operations).toEqual(["GET /v1.2/foo-bar"]);
+  });
 });
 
 describe("reserved keys refuse by name", () => {

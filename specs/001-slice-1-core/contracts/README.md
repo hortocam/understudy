@@ -4,9 +4,15 @@ Three interfaces, one file each:
 
 | File | What it fixes | Enforced by |
 |---|---|---|
-| `control-api.openapi.yaml` | the control plane's operations, payloads and error semantics | the integration suite drives the running control plane and asserts against this document |
+| `control-api.openapi.json` | the control plane's operations, payloads and error semantics | the integration suite drives the running control plane and asserts against this document, and a drift test asserts the *served bytes equal the checked-in file* |
 | `config.schema.yaml` | the project configuration file's keys | the config loader validates against it; a key not in it is a startup refusal |
 | `cli.md` | the `ustdy` command surface and its mapping onto control operations | a test asserts each CLI command issues exactly one control request and formats its reply without adding logic |
+
+**Names are honest.** `control-api.openapi.json` holds real JSON; `config.schema.yaml` holds JSON
+despite the `.yaml` name (a pre-existing inconsistency — the control contract was converted to a
+truthful `.json` name on 2026-10-05, see the amendment record in `tasks.md`). The served control
+document must be JSON because the contract declares `application/json` at `GET /openapi.json`;
+serving YAML bytes under that type fails every consumer that parses the response.
 
 ## Why the control API contract is checked in as a document
 
@@ -23,7 +29,7 @@ and is not regenerated from the tests.
 Every control operation answers a JSON body. A malformed control request is `400` with a
 `ControlError` body naming the offending field. A request under the reserved prefix that is **not**
 a control operation is `404` with `error: unknown_control_operation` — never routed into the
-mocked surface. Both are declared in `control-api.openapi.yaml`, so a consumer generating a client
+mocked surface. Both are declared in `control-api.openapi.json`, so a consumer generating a client
 from the served document knows they exist.
 
 ## Reserved keys in the config schema

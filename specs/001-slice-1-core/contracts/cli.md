@@ -9,7 +9,7 @@ This is the contract `tests/integration/cli.test.ts` asserts against.
 
 | Command | Control call | Renders | Notes |
 |---|---|---|---|
-| `ustdy up [--config <path>] [--port <n>] [--control-port <n>] [--control-url <url>]` | `GET /health` (polled until ready) | the startup report, then a ready line | **The one command that is not purely a client.** Something has to construct and start the server; `up` builds it from the config and then polls `/health`. It performs no engine work of its own. |
+| `ustdy up [--config <path>] [--port <n>] [--control-port <n>] [--control-url <url>] [--operation <entry>]…` | `GET /health` (polled until ready) | the startup report, then a ready line | **The one command that is not purely a client.** Something has to construct and start the server; `up` builds it from the config and then polls `/health`. It performs no engine work of its own. The operation selection may be given at start **as arguments or environment** (FR-020): repeat `--operation` with the same `METHOD /path` / `operationId` entries the config's `operations` accepts, or set `USTDY_OPERATIONS` (comma- or newline-separated). An explicit selection overrides the config file's `operations`; when neither is given, the config file's selection is used. |
 | `ustdy down [--control-url <url>]` | `POST /teardown` | success once the port is released | must not exit 0 before the port is actually free |
 | `ustdy ops list` | `GET /operations` | live and not-implemented operations | |
 | `ustdy reset [--to <mode>] [--entity <name>]…` | `POST /reset` | rows removed per entity | slice 1 implements `--to wipe` only; any other mode is refused by the control plane |

@@ -156,8 +156,8 @@ create a record, restart the process, read it back; call a non-selected operatio
       declared `ControlError` body** and never reaches the mocked surface; a malformed reset body
       returns the declared 400 `ControlError` (SC-002, FR-012–FR-017). Fails first.
 - [X] T029 [US2] Implement `src/control/routes.ts`: the five operations of
-      `contracts/control-api.openapi.yaml`, each answering exactly the documented shape.
-- [X] T030 [US2] Implement `src/control/openapi.ts`: serve `contracts/control-api.openapi.yaml` at
+      `contracts/control-api.openapi.json`, each answering exactly the documented shape.
+- [X] T030 [US2] Implement `src/control/openapi.ts`: serve `contracts/control-api.openapi.json` at
       the prefix's `openapi.json` (FR-018), and add a test asserting the served document equals
       the checked-in file byte for byte — a *drift* check, not a conformance tautology.
 - [X] T031 [US2] Implement `src/control/server.ts`: mount the control plane on its own Fastify
@@ -282,13 +282,15 @@ no existing task above is modified.
       wipe-reset) and slices 2–3 will read (`contradicts`). The doc is the frozen stored format; the
       code is renamed to it. Source: data-model.md §2/§3. Test added to `tests/unit/store.test.ts`
       before the code (red → green).
-- [ ] T048 Contract correction (needs coordinator approval — do NOT edit
-      `contracts/config.schema.yaml` unilaterally): widen the `operations` item pattern so an
-      `operationId` containing a hyphen or a dot (e.g. `get-widgets`, `api.getWidgets`) is accepted,
-      and align the `signing`/`clock` descriptions (currently "Setting it has no effect yet") with
-      the implemented refuse-loudly-on-presence behaviour (`contradicts`, spec-side). Source: FR-002
-      vs `contracts/config.schema.yaml` `operations` item pattern; constitution IX. Routes through
-      the coordinator/PR-#2 gate because it amends a reviewed contract.
+- [X] T048 Contract correction, **approved by the project owner and applied 2026-10-05** (coordinator):
+      the `operations` item **pattern was removed** (an `operationId` is constrained by OpenAPI only
+      as a unique string, and real documents use hyphens and dots, e.g. `get-widgets`,
+      `api.getWidgets`; a bare `minLength: 1` replaces it, and a genuinely unknown entry is still
+      refused at startup by name), and the `signing`/`clock` descriptions now state the implemented
+      refuse-loudly-**on-presence** behaviour instead of "Setting it has no effect yet". Source:
+      FR-002 vs `contracts/config.schema.yaml`; constitution IX. Landed with the contract
+      reconciliation PR (see the 2026-10-05 record below), with tests in `tests/unit/config.test.ts`
+      added before the contract change (red → green).
 - [X] T049 Read list parameters declared at the **Path Item Object** level, not only on the
       operation (`contradicts`). OpenAPI "Fixed Fields" makes a path item's `parameters` inherited
       by every operation on the path, so T046's rule false-fired on a document that declares shared
@@ -413,3 +415,49 @@ Append-only: no existing task above is modified.
       maps open quantifiers (`+`/`*`/`{n,}`) to exactly one unit — `^W-[0-9]+$` silently allocates
       `W-0..W-9` then 500 `UNIQUE` at create #11 with `ambiguities: []` (expected
       `identity-pattern-unsupported` per VI); owner: engineer, next converge.
+
+---
+
+## Amendment 2026-10-05 — contract reconciliation (T048, FR-020, `/openapi.json`)
+
+**Approved by:** the project owner (human), in session before dispatch of the next slice.
+**Recorded by:** the coordinator.
+
+**Why.** Three artefacts the human approved in the slice-1 spec PR contradicted something else in
+the same approved set, and each was found by an implementer or reviewer doing its job rather than
+silently diverging. Before handing a whole slice to an external coding agent — which reads artefacts
+but is bound by none of the mechanical gates the Kanban profiles had — the set has to agree with
+itself, or the agent is blamed for a defect that is ours.
+
+**What changed** (no requirement's intent changed; two are contract-level, one is a requirement-level
+choice the owner made):
+
+| Item | Was | Now |
+|---|---|---|
+| `contracts/config.schema.yaml` → `operations.items` (T048) | a `pattern` accepting only `METHOD /path` or an identifier-shaped `operationId` | the pattern **removed**; `minLength: 1`. OpenAPI constrains `operationId` only as a unique string, and real documents use hyphens/dots. A genuinely unknown entry is still refused at startup **by name** |
+| `contracts/config.schema.yaml` → `signing`, `clock` | "Setting it has no effect yet" | states the delivered **refuse-on-presence** behaviour (`RESERVED_CONFIG`, naming the key) |
+| `contracts/cli.md` → `up` row (FR-020) | no way to pass the selection at start | `--operation <entry>` (repeatable) and `USTDY_OPERATIONS`; an explicit selection overrides the config file's `operations` |
+| `contracts/control-api.openapi.yaml` → `control-api.openapi.json` | genuine YAML served under a declared `application/json` content type — the bytes could not satisfy the contract's own declaration | converted to **real JSON** (**zero comments**, so nothing was lost): the declared type is now truthful and a consumer can parse the served document directly |
+| `spec.md` FR-020 | "accept the operation selection at start … as arguments or environment" with no contract support | unchanged wording — the **contract** was made to satisfy it (reading 1) |
+
+**The pinned decisions and the alternatives rejected.**
+
+1. **FR-020 read as two things, not one** (owner's call). "The operation selection **and** the
+   configuration file path, as arguments or environment" names two separate things; reading 2 — that
+   naming the config file satisfies it — was rejected as the weaker reading, because it would make
+   the sentence's first half vacuous.
+2. **`/openapi.json`: convert the source, not the served bytes.** Rejected: serving
+   pretty-printed JSON of the YAML (loses byte-identity, weakens the anti-tautology drift test);
+   declaring a YAML content type (a served document that can't be consumed as JSON, and the
+   `.yaml` extension is already a lie given the file's style). Converting the *source* keeps both a
+   byte-pinned drift test and a machine-parseable served document. Precedent: `config.schema.yaml`
+   is JSON in a `.yaml` name — that convention was judged the worse half and dropped.
+
+**Constitutional basis.** PATCH for the description/language fixes; the `operations` change is a
+contract correction aligning the contract with FR-002, not a requirement change; the file rename is
+a naming/format correction. No principle is removed or redefined. Per Governance, amendments extend
+and never rewrite — T048's entry was amended **in place**, keeping its ID.
+
+**Scope fence.** This reconciliation authorises exactly the five items above. It does NOT authorise:
+implementing FR-020 in `src/cli/` (that is a follow-on code change against the amended contract); any
+other contract change; or any change to the mocked surface's semantics.

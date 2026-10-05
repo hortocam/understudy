@@ -405,6 +405,7 @@ amendment that changes no requirement is recorded in `tasks.md` instead and mere
 |---|---|---|---|
 | 2026-10-04 | A1 | PATCH | none — pins the not-implemented response (constant + body) in `tasks.md` T021/T026; FR-003 and SC-004 are unchanged and remain the contract |
 | 2026-10-04 | A2 | MINOR | **FR-002** restated so `METHOD /path` and `operationId` are equally-supported selectors, neither a fallback; **FR-023** extended to state which form resolved each live operation when a selection mixes forms; two edge cases added. Changes no acceptance criterion and no success criterion |
+| 2026-10-05 | A3 | PATCH | none to this document's wording — reconciles the **contracts** with it: FR-020's "at start, as arguments or environment" is now satisfiable (`contracts/cli.md` gains `--operation`/`USTDY_OPERATIONS`); FR-002's selector parity is now enforceable (`config.schema.yaml`'s `operations` pattern removed); and `contracts/control-api.openapi.yaml` → `.json` so the served document matches its declared `application/json`. Recorded in `tasks.md` under the 2026-10-05 amendment |
 
 ### 2026-10-04 — A2: selector forms are peers, not a fallback chain
 
