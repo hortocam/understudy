@@ -117,10 +117,10 @@ function checkReserved(raw: Record<string, unknown>, config: UnderstudyConfig): 
       "webhook HMAC signing is a later slice; remove the key or wait for that feature",
     );
   }
-  if (Object.prototype.hasOwnProperty.call(raw, "clock")) {
+  if (config.clock?.mode === "virtual") {
     throw new ReservedConfigError(
-      "clock",
-      "a virtual clock is a later slice; the tool uses the real clock and reports that it does",
+      "clock.mode",
+      'the virtual clock is a later slice (6); only "real" is implemented — omit the key or use "real"',
     );
   }
   if (config.storage.driver === "postgres") {

@@ -12,7 +12,11 @@ import {
   UnderstudyError,
 } from "../../src/errors.js";
 
+// Slice 2's contract is authoritative (plan → "Known integration point"); slice 1's file stays as history.
 const contractPath = fileURLToPath(
+  new URL("../../specs/002-data-layer/contracts/config.schema.yaml", import.meta.url),
+);
+const slice1ContractPath = fileURLToPath(
   new URL("../../specs/001-slice-1-core/contracts/config.schema.yaml", import.meta.url),
 );
 
@@ -29,6 +33,21 @@ describe("config schema", () => {
   it("keeps the inlined schema identical to the checked-in contract", () => {
     const contract = JSON.parse(readFileSync(contractPath, "utf8")) as unknown;
     expect(configSchema).toEqual(contract);
+  });
+
+  it("derives from slice 2's contract, and leaves slice 1's file in place as history", () => {
+    const slice1 = JSON.parse(readFileSync(slice1ContractPath, "utf8")) as { properties: Record<string, unknown> };
+    // slice 1's contract predates the extended keys: it is history, never edited
+    expect(slice1.properties.entities).toBeUndefined();
+    expect((configSchema as { properties: Record<string, unknown> }).properties.entities).toBeDefined();
+    expect(readFileSync(new URL("../../scripts/generate-config-schema.mjs", import.meta.url), "utf8")).toContain(
+      "specs/002-data-layer/contracts/config.schema.yaml",
+    );
+  });
+
+  it("states the default seed in the contract (D9, constitution IX)", () => {
+    const seed = (configSchema as { properties: { seed: { default?: unknown } } }).properties.seed;
+    expect(seed.default).toBe(0);
   });
 });
 
@@ -120,12 +139,17 @@ describe("reserved keys refuse by name", () => {
     expect((error as Error).message).toContain("signing");
   });
 
-  it("refuses clock", () => {
+  it("refuses clock.mode: virtual, but accepts the real clock and a pinned start (slice 2)", () => {
     const error = capture(() =>
       parseConfig("spec: ./api.yaml\noperations: [GET /pets]\nclock:\n  mode: virtual\n", "c.yaml"),
     );
     expect(error).toBeInstanceOf(ReservedConfigError);
-    expect((error as Error).message).toContain("clock");
+    expect((error as Error).message).toContain("clock.mode");
+    const ok = parseConfig(
+      "spec: ./api.yaml\noperations: [GET /pets]\nclock:\n  mode: real\n  start: 2026-01-02T03:04:05Z\n",
+      "c.yaml",
+    );
+    expect(ok.clock).toEqual({ mode: "real", start: "2026-01-02T03:04:05Z" });
   });
 
   it("refuses storage.driver: postgres", () => {

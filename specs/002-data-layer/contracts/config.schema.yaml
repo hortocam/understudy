@@ -40,7 +40,8 @@
     },
     "seed": {
       "type": "integer",
-      "description": "Default global seed. A recipe may override it. The per-collection seed is derived from the global seed and the collection name, so adding an unrelated collection changes no existing collection's records (FR-016).",
+      "default": 0,
+      "description": "Default global seed; when absent it is 0 (there is no hidden entropy — the same spec, config and fixtures always produce the same data). A recipe may override it, and `--seed` overrides both at start. The per-collection seed is derived from the global seed and the collection name, so adding an unrelated collection changes no existing collection's records (FR-016).",
       "examples": [42]
     },
     "entities": {

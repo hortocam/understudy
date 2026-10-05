@@ -1,5 +1,5 @@
 // GENERATED FILE — do not edit by hand.
-// Source: specs/001-slice-1-core/contracts/config.schema.yaml
+// Source: specs/002-data-layer/contracts/config.schema.yaml
 // Regenerate with: npm run generate
 export const configSchema: Record<string, unknown> = {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -23,17 +23,125 @@ export const configSchema: Record<string, unknown> = {
     "operations": {
       "type": "array",
       "minItems": 1,
-      "description": "The operations to make live. Everything else answers 501. Empty or unknown entries refuse to start.",
+      "description": "The operations to make live. Everything else answers 501. Empty or unknown entries refuse to start. An operation may be named by 'METHOD /path', by operationId, or by tag (a tag containing a space is written with '_').",
       "items": {
         "type": "string",
         "minLength": 1,
-        "description": "Either 'METHOD /path' (e.g. 'POST /inventory') or an operationId (any non-empty string). Both forms are peers: a document may support only one of them, so neither is a fallback. An operationId is NOT constrained to an identifier shape — OpenAPI only requires it to be a unique string, and real documents use hyphens and dots (e.g. 'get-widgets', 'api.getWidgets'). A genuinely unknown entry is refused at startup by name, not by this pattern.",
+        "description": "Either 'METHOD /path', an operationId, or a tag name. All three are peers with no precedence: a document may support only one of them (the measured target has 0 operationIds, so tag selectors are the ergonomic answer there), so none is a fallback. An operationId is NOT constrained to an identifier shape — OpenAPI only requires it to be a unique string, and real documents use hyphens and dots (e.g. 'get-widgets', 'api.getWidgets'); a tag containing a space is written with '_' ('Market Orders' -> 'Market_Orders'), with the raw form also accepted and an ambiguous collapse refused by name. A genuinely unknown entry is refused at startup by name, not by this pattern.",
         "examples": [
           "POST /inventory",
           "getInventoryById",
-          "get-widgets",
-          "api.getWidgets"
+          "Inventory",
+          "Market_Orders"
         ]
+      }
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The four configuration layers (FR-001). Each folder is loadable without the others; a missing folder is not an error.",
+      "properties": {
+        "static": {
+          "type": "string",
+          "default": "./static",
+          "description": "Versioned fixtures: 'lookups/' (small named tables) and 'entities/' (fixed records with fixed identities). Applied identically every run and never mutated by generation, import or API activity (FR-002, principle IV)."
+        },
+        "imports": {
+          "type": "string",
+          "default": "./imports",
+          "description": "Import mappings and their data. Shape defined and validated in this slice; read in slice 3."
+        },
+        "dynamic": {
+          "type": "string",
+          "default": "./dynamic",
+          "description": "Generation recipes — the switchable datasets. One file per recipe, selected by name (recipe:) or at start (--recipe)."
+        },
+        "behavior": {
+          "type": "string",
+          "default": "./behavior",
+          "description": "Targets, subscriptions, actions, reactions, simulations. Parsed and validated in this slice; acted on in slices 4-5."
+        }
+      }
+    },
+    "recipe": {
+      "type": "string",
+      "description": "Name of the recipe (a file under paths.dynamic, without extension) to apply. Overridable at start with --recipe. Absent means 'no generation': only fixtures are loaded.",
+      "examples": [
+        "ci-small",
+        "load-test"
+      ]
+    },
+    "seed": {
+      "type": "integer",
+      "default": 0,
+      "description": "Default global seed; when absent it is 0 (there is no hidden entropy — the same spec, config and fixtures always produce the same data). A recipe may override it, and `--seed` overrides both at start. The per-collection seed is derived from the global seed and the collection name, so adding an unrelated collection changes no existing collection's records (FR-016).",
+      "examples": [
+        42
+      ]
+    },
+    "entities": {
+      "type": "object",
+      "description": "Per-collection overrides. Every key is optional: an unlisted collection is generated with inferred links and the default precedence chain.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "idField": {
+            "type": "string",
+            "description": "The identity property. Defaults to the derived identity field."
+          },
+          "writes": {
+            "type": "string",
+            "enum": [
+              "api",
+              "actions-only"
+            ],
+            "default": "api",
+            "description": "'actions-only' refuses API writes for this collection even if the document declares them (used from slice 5)."
+          },
+          "ids": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "generatedStart": {
+                "type": "integer",
+                "description": "First generated identity, for an integer identity space. Reserved: it must not overlap fixture identities."
+              },
+              "reserved": {
+                "type": "string",
+                "description": "An explicit reserved span for a non-integer identity space (a uuid or vendor-prefixed format). Overlapping configured spans refuse to start, naming the collection (FR-017, SC-006)."
+              }
+            }
+          },
+          "relations": {
+            "type": "object",
+            "description": "Explicit links, pinned by configuration. These take precedence over every inferred link (evidence order, FR-006).",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "to"
+              ],
+              "properties": {
+                "to": {
+                  "type": "string",
+                  "description": "Target as '<Collection>.<field>', e.g. 'Event.id'.",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*\\.[A-Za-z_][A-Za-z0-9_]*$"
+                },
+                "onDelete": {
+                  "type": "string",
+                  "enum": [
+                    "restrict",
+                    "cascade",
+                    "setNull"
+                  ],
+                  "default": "restrict",
+                  "description": "The delete policy for the generated foreign key. Arrives in this slice, where relationships first become concrete. An undetermined (reported, not decided) link gets no constraint."
+                }
+              }
+            }
+          }
+        }
       }
     },
     "server": {
@@ -106,7 +214,7 @@ export const configSchema: Record<string, unknown> = {
         "generatedStart": {
           "type": "integer",
           "default": 100000,
-          "description": "First identity for records created over the API. Reserved range: it must not overlap identities that fixtures will declare in slice 2."
+          "description": "First identity for records created over the API. Reserved range: it must not overlap identities that fixtures declare."
         }
       }
     },
@@ -128,7 +236,7 @@ export const configSchema: Record<string, unknown> = {
     "clock": {
       "type": "object",
       "additionalProperties": false,
-      "description": "RESERVED — accepted by the schema so the shape is stable, but not read in this slice, and selecting it is a STARTUP REFUSAL naming the key (it is never a silent no-op). A virtual clock (fast-forward for time-dependent scenarios) is a later slice; until then the tool uses the real clock and reports that it does.",
+      "description": "The clock seam. 'real' is implemented and is the default; 'virtual' is RESERVED for slice 6, and selecting it refuses to start naming the mode. Every time-derived field is governed by this clock so exports are comparable, and the startup report states the mode in force (FR-019).",
       "properties": {
         "mode": {
           "type": "string",
@@ -140,7 +248,8 @@ export const configSchema: Record<string, unknown> = {
         },
         "start": {
           "type": "string",
-          "format": "date-time"
+          "format": "date-time",
+          "description": "The instant the real clock reports and the reference date pinned for every time-relative generated value, so a seeded run is reproducible (research §1)."
         }
       }
     }

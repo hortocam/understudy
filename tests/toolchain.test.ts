@@ -11,3 +11,14 @@ describe("toolchain", () => {
     expect(import.meta.url).toMatch(/^file:/);
   });
 });
+
+describe("slice-2 dependencies (T001)", () => {
+  it("imports faker with a seedable randomizer and jsonata under NodeNext ESM", async () => {
+    const { Faker, en, generateMersenne53Randomizer } = await import("@faker-js/faker");
+    const first = new Faker({ locale: [en], randomizer: generateMersenne53Randomizer(42) }).number.int({ max: 1e9 });
+    const again = new Faker({ locale: [en], randomizer: generateMersenne53Randomizer(42) }).number.int({ max: 1e9 });
+    expect(first).toBe(again);
+    const { default: jsonata } = await import("jsonata");
+    expect(await jsonata("a + 1").evaluate({ a: 41 })).toBe(42);
+  });
+});

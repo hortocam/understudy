@@ -79,10 +79,10 @@ against the remote.
 **Purpose**: dependencies, the architecture guard for the new module boundary, and the two
 repoints the plan names as required.
 
-- [ ] T001 Add `@faker-js/faker` `^9` and `jsonata` `^2` to `package.json`, `npm ci`, and verify
+- [X] T001 Add `@faker-js/faker` `^9` and `jsonata` `^2` to `package.json`, `npm ci`, and verify
       `npm audit` reports no new advisories and that both import under Node 22 ESM with
       `NodeNext` resolution (a one-line smoke assertion in `tests/toolchain.test.ts`).
-- [ ] T002 [P] [FND] Extend `tests/unit/architecture.test.ts` with the new boundaries: `src/spec/`
+- [X] T002 [P] [FND] Extend `tests/unit/architecture.test.ts` with the new boundaries: `src/spec/`
       MUST NOT import `src/data/` (plan Structure Decision — derivation stays testable without a
       store); `src/cli/` MUST NOT import `src/data/`, `src/spec/`, `src/store/`, `src/mock/`;
       `src/data/` MUST NOT import `src/cli/`, `src/mock/`, `src/control/`; **no source file reads
@@ -90,18 +90,18 @@ repoints the plan names as required.
       finds nothing). **Negative control**: the checker is exercised against a synthetic
       violating source string and must flag it, so a green run cannot mean "the scanner is
       blind".
-- [ ] T003 [P] [FND] Test for the **clock seam** in `tests/unit/clock.test.ts`: the real clock
+- [X] T003 [P] [FND] Test for the **clock seam** in `tests/unit/clock.test.ts`: the real clock
       reports `mode: "real"`; with `clock.start` it returns that exact instant and **never
       advances during a run**; without it, `now()` is read once per `startRun()` and every later
       read in that run returns the same instant; `mode: "virtual"` is refused naming the mode.
       Fails first (stub returns `Date.now()` per call).
-- [ ] T004 [FND] Implement `src/clock.ts`: `interface Clock { readonly mode: "real" | "virtual";
+- [X] T004 [FND] Implement `src/clock.ts`: `interface Clock { readonly mode: "real" | "virtual";
       now(): Date }`, `createClock(config)`, a run-scoped `freeze()`; the real implementation
       only. Wire `config.clock` through `src/config/load.ts` — `clock.mode: real` and
       `clock.start` become *accepted keys* (slice 1 refuses `clock` on presence; `virtual` and
       `signing`/`postgres` still refuse, naming the key). Update `tests/unit/config.test.ts`
       expectations that asserted the old blanket `clock` refusal **in the same change**.
-- [ ] T005 [FND] **Contract repoint — config.** Test first: change the drift test in
+- [X] T005 [FND] **Contract repoint — config.** Test first: change the drift test in
       `tests/unit/config.test.ts` to read
       `specs/002-data-layer/contracts/config.schema.yaml` and assert
       `src/config/schema.generated.ts` equals it — **red** because the generated copy still
@@ -110,7 +110,7 @@ repoints the plan names as required.
       assert in the same test that slice 1's contract file is **unchanged** (`git diff --quiet
       origin/main -- specs/001-slice-1-core`). Slice 1's file is history: not deleted, not
       edited.
-- [ ] T006 [FND] **Contract repoint — control API (D4).** Create
+- [X] T006 [FND] **Contract repoint — control API (D4).** Create
       `specs/002-data-layer/contracts/control-api.openapi.json` as a byte-for-byte copy of slice
       1's plus the FR-021 `POST /generate` operation and its schemas
       (`GenerateRequest {recipe?, seed?}`, `GenerateResult {recipe, seed, clockMode, created:
@@ -762,3 +762,16 @@ blind spot** → T083; **contract repoint** → T005 (+T006 for the control cont
 simulations (slice 5), hardening, virtual clock, Postgres (slice 6), conformance/examples
 (slice 7). The behaviour and imports layers are **parsed and validated** here and consumed
 nowhere.
+
+---
+
+## Implementation notes (appended during the run; no task above is modified except its checkbox)
+
+- **T001 — dependency pin.** `@faker-js/faker` is pinned `^10.6.0`, not the `^9` named in
+  `plan.md`: every 9.x and 10.x ≤ 10.4 carries a *high* advisory (GHSA-qxc2-j82w-r537,
+  `helpers.fake` arbitrary-code execution) and T001 requires no new advisories. 10.6 keeps the seeded
+  `Faker({ locale, randomizer })`, `setDefaultRefDate` and `generateMersenne53Randomizer` API the
+  research §1 design uses (verified by the T001 smoke test). Recorded in the PR.
+- **T002 — `process.env`.** The one `process.env` read is `src/cli/index.ts`, the CLI's process
+  boundary, which hands the environment to the (env-free) program; the guard asserts the *library*
+  never reads it.

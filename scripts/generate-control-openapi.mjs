@@ -1,6 +1,6 @@
 // Generates src/control/openapi.generated.ts from the checked-in control-API contract.
 //
-// The contract lives at specs/001-slice-1-core/contracts/control-api.openapi.json and is
+// The contract lives at specs/002-data-layer/contracts/control-api.openapi.json and is
 // genuine JSON, so the control plane can serve it byte-for-byte (FR-018) under the
 // `application/json` content type it declares — the bytes and the declared type agree, and a
 // consumer can parse the served document directly. (It was YAML served as application/json
@@ -15,14 +15,14 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const contractPath = resolve(root, "specs/001-slice-1-core/contracts/control-api.openapi.json");
+const contractPath = resolve(root, "specs/002-data-layer/contracts/control-api.openapi.json");
 const outPath = resolve(root, "src/control/openapi.generated.ts");
 
 const raw = readFileSync(contractPath, "utf8");
 
 const header = [
   "// GENERATED FILE — do not edit by hand.",
-  "// Source: specs/001-slice-1-core/contracts/control-api.openapi.json",
+  "// Source: specs/002-data-layer/contracts/control-api.openapi.json",
   "// Regenerate with: npm run generate",
   "",
 ].join("\n");
