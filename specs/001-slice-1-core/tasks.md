@@ -21,14 +21,14 @@ task below is preceded by the test task that defines it.
 commit landed strict TypeScript, eslint, vitest and CI before the spec was written, because a
 project that cannot run its own tests cannot be developed test-first.
 
-- [ ] T001 Add the runtime dependencies pinned in `plan.md` to `package.json` and install:
+- [X] T001 Add the runtime dependencies pinned in `plan.md` to `package.json` and install:
       `fastify`, `@scalar/openapi-parser`, `@scalar/openapi-upgrader`, `ajv`, `ajv-formats`,
       `better-sqlite3`, `yaml`, `commander` (+ `@types/better-sqlite3`), and verify `npm audit`
       reports no new advisories.
-- [ ] T002 [P] Add the module boundary test in `tests/unit/architecture.test.ts`: assert that no
+- [X] T002 [P] Add the module boundary test in `tests/unit/architecture.test.ts`: assert that no
       file under `src/cli/` imports from `src/mock/`, `src/store/` or `src/spec/`. This is the
       machine-checkable half of FR-019 and it must fail before the boundary exists.
-- [ ] T003 [P] Add the `bin` entry (`ustdy` → `dist/cli/index.js`) and scripts to `package.json`,
+- [X] T003 [P] Add the `bin` entry (`ustdy` → `dist/cli/index.js`) and scripts to `package.json`,
       and confirm `npm run build && node dist/cli/index.js --help` exits 0.
 
 ---
@@ -41,51 +41,51 @@ phase rather than distributed across the stories.
 
 **⚠️ CRITICAL**: no user story work begins until this phase is complete.
 
-- [ ] T004 [P] Define the error taxonomy in `src/errors.ts`: one class per refusal cause the spec
+- [X] T004 [P] Define the error taxonomy in `src/errors.ts`: one class per refusal cause the spec
       names (document unreadable, document undereferenceable, empty selection, unknown operation
       in selection, config invalid, config contradicts document, store unwritable, port in use).
       Each carries the offending value so the message can name it (FR-004, FR-021).
-- [ ] T005 [P] Test for T004 in `tests/unit/errors.test.ts`: each error's message contains the
+- [X] T005 [P] Test for T004 in `tests/unit/errors.test.ts`: each error's message contains the
       offending value. Fails first.
-- [ ] T006 Define the config JSON Schema in `src/config/schema.ts` by importing
+- [X] T006 Define the config JSON Schema in `src/config/schema.ts` by importing
       `specs/001-slice-1-core/contracts/config.schema.yaml` as the single source (parse it at
       build time or inline it by generated copy — decide here and record why), then implement
       `loadConfig()` in `src/config/load.ts`: read YAML, validate against the schema, apply the
       documented defaults, refuse on unknown keys.
-- [ ] T007 Test for T006 in `tests/unit/config.test.ts`: defaults applied; unknown key refused;
+- [X] T007 Test for T006 in `tests/unit/config.test.ts`: defaults applied; unknown key refused;
       a config whose `operations` is empty refused; a spec-relative path resolved relative to the
       config file, not the process cwd. Fails first.
-- [ ] T008 Define the `Store` interface in `src/store/index.ts` — open/close, ensure table for a
+- [X] T008 Define the `Store` interface in `src/store/index.ts` — open/close, ensure table for a
       resource, insert/readOne/list/update/delete, wipe, removeByOrigin, request-log append and
       query, meta get/set, next identity — and nothing else. This is the principle-X seam; it must
       not leak SQL anywhere else.
-- [ ] T009 Implement `src/store/schema.ts` (DDL per `data-model.md`) and `src/store/sqlite.ts`
+- [X] T009 Implement `src/store/schema.ts` (DDL per `data-model.md`) and `src/store/sqlite.ts`
       against T008.
-- [ ] T010 [P] Test for T008/T009 in `tests/unit/store.test.ts` against a real temp SQLite file:
+- [X] T010 [P] Test for T008/T009 in `tests/unit/store.test.ts` against a real temp SQLite file:
       round-trip a record, list it, wipe it, read the meta table; assert the DDL matches
       `data-model.md` (column names and the `origin` CHECK constraint).
-- [ ] T011 Implement `src/spec/load.ts`: read the document from a path or URL, dereference
+- [X] T011 Implement `src/spec/load.ts`: read the document from a path or URL, dereference
       (including external refs), upconvert 3.0 → 3.1, and extract the spec's own version + a
       content hash for `_understudy_meta`. No network access except a URL the user supplied
       (FR-001, FR-022).
-- [ ] T012 Implement `src/spec/operations.ts`: resolve the configured `operations` entries against
+- [X] T012 Implement `src/spec/operations.ts`: resolve the configured `operations` entries against
       the document — each entry by `METHOD /path` **or** by `operationId`, the two forms being peers
       with no precedence (A2) — producing the live set and the not-implemented set, and recording
       which form resolved each entry for the startup report; refuse the whole selection if any entry
       does not exist (FR-002, FR-004, FR-023).
-- [ ] T013 [P] Test for T011/T012 in `tests/unit/spec-load.test.ts`: a fixture document with an
+- [X] T013 [P] Test for T011/T012 in `tests/unit/spec-load.test.ts`: a fixture document with an
       external `$ref` resolves; a 3.0 document and its 3.1 twin produce the same operations; an
       unknown selection entry is refused by name; a URL spec is never fetched when the path form
       was given (assert no network call).
-- [ ] T014 Implement `src/spec/resources.ts`: the resource-derivation and relationship-inference
+- [X] T014 Implement `src/spec/resources.ts`: the resource-derivation and relationship-inference
       rules enumerated in `plan.md` → "Derivation rules", each relationship carrying its
       `evidence` (`configured` | `extension` | `convention` | `nesting`).
-- [ ] T015 [P] Test for T014 in `tests/unit/resources.test.ts` with fixture documents that exercise
+- [X] T015 [P] Test for T014 in `tests/unit/resources.test.ts` with fixture documents that exercise
       each evidence rule *and* the ambiguity path (a path that matches no resource; an operation
       with no declared 2xx schema). Assert the reported entity name, id field and id type.
-- [ ] T016 Implement `src/spec/report.ts`: build the `StartupReport` data structure from the derived
+- [X] T016 Implement `src/spec/report.ts`: build the `StartupReport` data structure from the derived
       model (live ops, not-selected ops, resources, relationships with evidence, ambiguities).
-- [ ] T017 Implement `src/logging.ts`: structured (JSON-line) logs to stdout with a level, and a
+- [X] T017 Implement `src/logging.ts`: structured (JSON-line) logs to stdout with a level, and a
       human-readable renderer for the startup report. Both from the same data (FR-024).
 
 **Checkpoint**: the tool can load a document, validate a config, derive resources, and open a store
@@ -101,34 +101,34 @@ else answers "not implemented in this mock", visibly distinct from "no such reco
 **Independent Test**: with the fixture document from `quickstart.md` §1 and the config from §2,
 create a record, restart the process, read it back; call a non-selected operation and get 501.
 
-- [ ] T018 [P] [US1] Write the fixture document `tests/fixtures/inventory-api.yaml` (one collection,
+- [X] T018 [P] [US1] Write the fixture document `tests/fixtures/inventory-api.yaml` (one collection,
       five selected operations, one deliberately unselected operation, a declared 2xx and the
       declared error statuses) and a second fixture exercising a paging style.
-- [ ] T019 [P] [US1] Contract test in `tests/contract/crud.test.ts` that drives the mock over HTTP
+- [X] T019 [P] [US1] Contract test in `tests/contract/crud.test.ts` that drives the mock over HTTP
       and asserts every response against `tests/fixtures/inventory-api.yaml` — the SC-003 suite.
       Fails first.
-- [ ] T020 [P] [US1] Integration test in `tests/integration/persistence.test.ts`: create → restart
+- [X] T020 [P] [US1] Integration test in `tests/integration/persistence.test.ts`: create → restart
       the process → read back (SC-002). Fails first. Also assert the machine-checked form of
       constitution IV: after a full CRUD workout, **every** row in the SQLite file has
       `origin='runtime'` — the CHECK constraint alone permits all four values, so the invariant
       needs a test, not a comment.
-- [ ] T021 [P] [US1] Integration test in `tests/integration/not-implemented.test.ts`: a
+- [X] T021 [P] [US1] Integration test in `tests/integration/not-implemented.test.ts`: a
       non-selected operation answers with `NOT_IMPLEMENTED` — the single exported constant, value
       **501** (RFC 9110 §15.6.2) — and the status is never the document's declared not-found status
       (SC-004, FR-003). The body matches the tool's own `NotImplementedBody` schema and names the
       unimplemented operation. Fails first. Assert against the constant, never a bare `501` literal.
-- [ ] T022 [US1] Implement `src/mock/validate.ts`: compile an Ajv validator per operation from the
+- [X] T022 [US1] Implement `src/mock/validate.ts`: compile an Ajv validator per operation from the
       dereferenced document (draft 2020-12), and validate request bodies, parameters and headers.
-- [ ] T023 [US1] Implement `src/mock/errors.ts`: render the document's *declared* error responses
+- [X] T023 [US1] Implement `src/mock/errors.ts`: render the document's *declared* error responses
       for that operation, with the declared status and body shape (FR-005, FR-008).
-- [ ] T024 [US1] Implement `src/mock/crud.ts`: create / read / list / update / delete over the
+- [X] T024 [US1] Implement `src/mock/crud.ts`: create / read / list / update / delete over the
       `Store` interface, using the derived resource model; PUT replaces, PATCH merges (FR-006);
       allocate identities per `data-model.md` §"Identity allocation" (FR-011); set `origin` and
       the timestamps; return the 2xx status the document declares (FR-005, FR-009).
-- [ ] T025 [US1] Implement `src/mock/list.ts`: filtering, sorting and paging over the declared
+- [X] T025 [US1] Implement `src/mock/list.ts`: filtering, sorting and paging over the declared
       query parameters, in the declared paging style; where none is declared, return the full
       collection (FR-007). Prove paging does not load the collection into memory.
-- [ ] T026 [US1] Implement `src/mock/route.ts` and `src/index.ts`: build the Fastify instance from
+- [X] T026 [US1] Implement `src/mock/route.ts` and `src/index.ts`: build the Fastify instance from
       the derived model, match a request against the live set, dispatch to T024/T025, answer the
       exported `NOT_IMPLEMENTED` constant (501) for a known-but-unselected operation with the
       `NotImplementedBody` shape, and the normal HTTP not-found response for a path the document does
@@ -136,7 +136,7 @@ create a record, restart the process, read it back; call a non-selected operatio
       in this file; reference the exported constant so there is one home for the value.
       Added by the 2026-10-04 amendment (A1): the response code and body for the not-implemented
       answer are pinned to one exported constant and one schema instead of living only in prose.
-- [ ] T027 [US1] Wire the startup report: refuse to start on any T004 error, otherwise log the
+- [X] T027 [US1] Wire the startup report: refuse to start on any T004 error, otherwise log the
       report (FR-023). Re-run T019–T021; they must now pass.
 
 **Checkpoint**: the mock serves CRUD, persists, validates, and answers 501 distinctly. MVP.
@@ -149,23 +149,23 @@ create a record, restart the process, read it back; call a non-selected operatio
 
 **Independent Test**: drive health → create → list → reset → teardown entirely over HTTP.
 
-- [ ] T028 [P] [US2] Integration test in `tests/integration/control.test.ts` for `quickstart.md`
+- [X] T028 [P] [US2] Integration test in `tests/integration/control.test.ts` for `quickstart.md`
       §7: health reports store reachability; reset wipes and leaves the mock answering; operations
       lists both sets; requests filters; teardown releases the port; a **second** teardown is not
       destructive; an unknown control path under the prefix returns the control 404 **with the
       declared `ControlError` body** and never reaches the mocked surface; a malformed reset body
       returns the declared 400 `ControlError` (SC-002, FR-012–FR-017). Fails first.
-- [ ] T029 [US2] Implement `src/control/routes.ts`: the five operations of
+- [X] T029 [US2] Implement `src/control/routes.ts`: the five operations of
       `contracts/control-api.openapi.yaml`, each answering exactly the documented shape.
-- [ ] T030 [US2] Implement `src/control/openapi.ts`: serve `contracts/control-api.openapi.yaml` at
+- [X] T030 [US2] Implement `src/control/openapi.ts`: serve `contracts/control-api.openapi.yaml` at
       the prefix's `openapi.json` (FR-018), and add a test asserting the served document equals
       the checked-in file byte for byte — a *drift* check, not a conformance tautology.
-- [ ] T031 [US2] Implement `src/control/server.ts`: mount the control plane on its own Fastify
+- [X] T031 [US2] Implement `src/control/server.ts`: mount the control plane on its own Fastify
       instance, on the same port under the reserved prefix or on `control.port` when configured;
       record every mocked-surface request into `_requests` with live/status/duration (FR-016).
-- [ ] T032 [US2] Implement the `wipe` reset mode through `Store.removeByOrigin` + resetting the
+- [X] T032 [US2] Implement the `wipe` reset mode through `Store.removeByOrigin` + resetting the
       identity counters (FR-014), and refuse `mode` values not in the enum.
-- [ ] T033 [US2] Implement teardown (`POST /teardown`): stop accepting, drain, release the port,
+- [X] T033 [US2] Implement teardown (`POST /teardown`): stop accepting, drain, release the port,
       and answer idempotently (FR-017). Prove the port is free by binding it again in the test.
 
 **Checkpoint**: the whole lifecycle is drivable over HTTP.
