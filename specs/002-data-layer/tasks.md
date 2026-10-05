@@ -679,7 +679,7 @@ proven **and** proven falsifiable.
       engine code and asserts the engine has no document-specific identifiers (scan `src/data/`
       for quoted names drawn from the fixture documents). **NC**: add a `if (name === "Event")`
       to a copy; the scan must flag it.
-- [X] T087 **Opt-in live derivation** — `tests/live/live-derivation.test.ts`, skipped unless
+- [ ] T087 **Opt-in live derivation** — `tests/live/live-derivation.test.ts`, skipped unless
       `USTDY_LIVE_SPEC` is set (Scenario 9; **never CI-blocking, never vendored** — licence
       unresolved). Fetch on demand from
       `https://pointofsaleapi.stubhub.net/swagger/v1/swagger.json`, **verify the sha256 equals
@@ -901,3 +901,10 @@ nowhere.
   SQL, params and rows crossing into JS; offset/limit, page/size and cursor are each asserted over
   20 000 rows; `MaterialisingStore` (reads everything through the driver, slices in JS) returns a
   correct page at the `Store` interface and is rejected by the probe (`20000 rows`, `no bound LIMIT`).
+- **T087 — NOT COMPLETE (left unticked on purpose).** The harness (`tests/live/`, `test:live`,
+  `vitest.live.config.ts`, default `npm test` excludes it) is delivered and was run against local
+  stand-in documents, but **the vendor document could not be fetched**: the build environment's
+  egress policy answered 403 to the CONNECT for `pointofsaleapi.stubhub.net:443` (an organisation
+  policy denial; not retried, not worked around). No vendor measurement exists, and none is
+  invented — see `specs/002-data-layer/live-derivation.md` for the status and the one command that
+  completes it. The outcome file is a **new** document (the approved `research.md` is not edited).
