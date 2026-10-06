@@ -16,6 +16,7 @@ import { listRecords, ListCursorError } from "./list.js";
 import { collectOperations } from "../spec/operations.js";
 import { declaredClientStatus, NOT_IMPLEMENTED, notImplementedBody, renderDeclaredError, unboundOperationBody } from "./errors.js";
 import { validateBody, validateParameters } from "./validate.js";
+import { ReferenceViolationError } from "../store/index.js";
 
 export interface RouteContext {
   document: Record<string, unknown>;
@@ -140,6 +141,25 @@ function invalidRequest(operation: DocumentOperation): { status: number; body: u
   return rendered ?? { status: 400, body: { error: "invalid_request", message } };
 }
 
+/**
+ * A write that broke a foreign key, answered in the document's own declared error vocabulary:
+ * a missing parent is a bad request (400), a delete of a still-referenced parent is a conflict
+ * (409); each falls back to the first client error the operation declares, and only to our own
+ * status when it declares none (FR-005, FR-008). The mock states the cause rather than a bare 500.
+ */
+function referenceViolation(operation: DocumentOperation, error: ReferenceViolationError): { status: number; body: unknown } {
+  const preferred = error.kind === "referenced" ? 409 : 400;
+  const message =
+    error.kind === "referenced"
+      ? `${error.resource} cannot be deleted: other records still reference it`
+      : `${error.resource} references a record that does not exist`;
+  const rendered = renderDeclaredError(operation.operation, declaredClientStatus(operation.operation, preferred) ?? preferred, {
+    code: error.kind === "referenced" ? "conflict" : "invalid_reference",
+    message,
+  });
+  return rendered ?? { status: preferred, body: { error: error.kind === "referenced" ? "conflict" : "invalid_reference", message } };
+}
+
 interface ParsedBody {
   value: unknown;
   ok: boolean;
@@ -246,7 +266,7 @@ export function buildMockServer(context: RouteContext): FastifyInstance {
         params[name] = match[index + 1] as string;
       });
     }
-    const identity = params[binding.resource.idField] ?? Object.values(params)[0] ?? "";
+    const identity = params[binding.resource.instanceParam ?? binding.resource.idField] ?? params[binding.resource.idField] ?? Object.values(params)[0] ?? "";
 
     switch (binding.kind) {
       case "list": {
@@ -283,7 +303,16 @@ export function buildMockServer(context: RouteContext): FastifyInstance {
           const error = invalidRequest(binding.operation);
           return reply.code(error.status).send(error.body);
         }
-        const record = createRecord(context.crud, binding.resource, parsed.value);
+        let record: Record<string, unknown>;
+        try {
+          record = createRecord(context.crud, binding.resource, parsed.value);
+        } catch (error) {
+          if (error instanceof ReferenceViolationError) {
+            const refused = referenceViolation(binding.operation, error);
+            return reply.code(refused.status).send(refused.body);
+          }
+          throw error;
+        }
         const status = declaredSuccess(binding.operation);
         return reply.code(status).send(status === 204 ? undefined : record);
       }
@@ -305,7 +334,16 @@ export function buildMockServer(context: RouteContext): FastifyInstance {
           const error = invalidRequest(binding.operation);
           return reply.code(error.status).send(error.body);
         }
-        const updated = updateRecord(context.crud, binding.resource, identity, parsed.value, mode);
+        let updated: Record<string, unknown> | undefined;
+        try {
+          updated = updateRecord(context.crud, binding.resource, identity, parsed.value, mode);
+        } catch (error) {
+          if (error instanceof ReferenceViolationError) {
+            const refused = referenceViolation(binding.operation, error);
+            return reply.code(refused.status).send(refused.body);
+          }
+          throw error;
+        }
         if (!updated) {
           const error = missingRecord(binding.resource, binding.operation, identity);
           return reply.code(error.status).send(error.body);
@@ -313,7 +351,16 @@ export function buildMockServer(context: RouteContext): FastifyInstance {
         return reply.code(declaredSuccess(binding.operation)).send(updated);
       }
       case "delete": {
-        const removed = deleteRecord(context.crud, binding.resource, identity);
+        let removed: boolean;
+        try {
+          removed = deleteRecord(context.crud, binding.resource, identity);
+        } catch (error) {
+          if (error instanceof ReferenceViolationError) {
+            const refused = referenceViolation(binding.operation, error);
+            return reply.code(refused.status).send(refused.body);
+          }
+          throw error;
+        }
         if (!removed) {
           const error = missingRecord(binding.resource, binding.operation, identity);
           return reply.code(error.status).send(error.body);

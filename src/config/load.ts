@@ -52,6 +52,31 @@ export interface ClockConfig {
   start?: string;
 }
 
+/** The four layer folders, resolved to absolute paths against the config file's directory (FR-001). */
+export interface PathsConfig {
+  static: string;
+  imports: string;
+  dynamic: string;
+  behavior: string;
+}
+
+export interface InferenceConfig {
+  idSuffixes: string[];
+  ambiguousNames: string[];
+}
+
+export interface RelationConfig {
+  to: string;
+  onDelete: "restrict" | "cascade" | "setNull";
+}
+
+export interface EntityConfig {
+  idField?: string;
+  writes?: "api" | "actions-only";
+  ids?: { generatedStart?: number; reserved?: string };
+  relations?: Record<string, RelationConfig>;
+}
+
 export interface UnderstudyConfig {
   /** Absolute path or URL of the OpenAPI document. */
   spec: string;
@@ -62,12 +87,33 @@ export interface UnderstudyConfig {
   ids: IdsConfig;
   signing?: SigningConfig;
   clock?: ClockConfig;
+  /** The directory the config file lives in; layer paths and plugin files resolve against it. */
+  baseDir: string;
+  paths: PathsConfig;
+  /** The recipe to apply (a file under `paths.dynamic`, without extension); absent means fixtures only. */
+  recipe?: string;
+  /** The global seed; 0 when absent (D9 — no hidden entropy). */
+  seed: number;
+  entities: Record<string, EntityConfig>;
+  inference: InferenceConfig;
+  /** `ustdy up --seed`: overrides the recipe's and the configuration's seed. Not a file key. */
+  seedOverride?: number;
+}
+
+/** The seed in force: `--seed`, else the recipe's, else the configuration's (default 0). */
+export function effectiveSeed(config: Pick<UnderstudyConfig, "seed" | "seedOverride">, recipe?: { seed?: number }): number {
+  return config.seedOverride ?? recipe?.seed ?? config.seed;
 }
 
 const DEFAULT_SERVER: ServerConfig = { port: 8080, host: "127.0.0.1", basePath: "" };
 const DEFAULT_CONTROL: ControlConfig = { prefix: "/__understudy" };
 const DEFAULT_STORAGE: StorageConfig = { driver: "sqlite", path: "./.understudy/state.db" };
 const DEFAULT_IDS: IdsConfig = { generatedStart: 100000 };
+const DEFAULT_PATHS = { static: "./static", imports: "./imports", dynamic: "./dynamic", behavior: "./behavior" };
+const DEFAULT_INFERENCE: InferenceConfig = {
+  idSuffixes: ["Id", "_id"],
+  ambiguousNames: ["externalId", "referenceId", "refId", "parentId"],
+};
 
 const URL_LIKE = /^[a-z][a-z0-9+.-]*:\/\//i;
 
@@ -96,17 +142,26 @@ function describeError(error: ErrorObject): { value: unknown; detail: string } {
   return { value: error.instancePath.length > 0 ? error.instancePath : error.keyword, detail: `${error.message ?? "is invalid"}${at}` };
 }
 
+/**
+ * Fill defaults for ABSENT sections only. A section that is present but the wrong shape is passed
+ * through untouched so validation refuses it (FR-005) — defaulting it would hide the mistake.
+ */
+function withDefaults(value: unknown, defaults: object): unknown {
+  if (value === undefined) return { ...defaults };
+  return isPlainObject(value) ? { ...defaults, ...value } : value;
+}
+
 function applyDefaults(raw: Record<string, unknown>): Record<string, unknown> {
-  const server = isPlainObject(raw.server) ? raw.server : {};
-  const control = isPlainObject(raw.control) ? raw.control : {};
-  const storage = isPlainObject(raw.storage) ? raw.storage : {};
-  const ids = isPlainObject(raw.ids) ? raw.ids : {};
   return {
     ...raw,
-    server: { ...DEFAULT_SERVER, ...server },
-    control: { ...DEFAULT_CONTROL, ...control },
-    storage: { ...DEFAULT_STORAGE, ...storage },
-    ids: { ...DEFAULT_IDS, ...ids },
+    paths: withDefaults(raw.paths, DEFAULT_PATHS),
+    inference: withDefaults(raw.inference, DEFAULT_INFERENCE),
+    seed: raw.seed === undefined ? 0 : raw.seed,
+    entities: raw.entities === undefined ? {} : raw.entities,
+    server: withDefaults(raw.server, DEFAULT_SERVER),
+    control: withDefaults(raw.control, DEFAULT_CONTROL),
+    storage: withDefaults(raw.storage, DEFAULT_STORAGE),
+    ids: withDefaults(raw.ids, DEFAULT_IDS),
   };
 }
 
@@ -117,11 +172,19 @@ function checkReserved(raw: Record<string, unknown>, config: UnderstudyConfig): 
       "webhook HMAC signing is a later slice; remove the key or wait for that feature",
     );
   }
-  if (Object.prototype.hasOwnProperty.call(raw, "clock")) {
+  if (config.clock?.mode === "virtual") {
     throw new ReservedConfigError(
-      "clock",
-      "a virtual clock is a later slice; the tool uses the real clock and reports that it does",
+      "clock.mode",
+      'the virtual clock is a later slice (6); only "real" is implemented — omit the key or use "real"',
     );
+  }
+  for (const [name, entity] of Object.entries(config.entities)) {
+    if (entity.writes === "actions-only") {
+      throw new ReservedConfigError(
+        `entities.${name}.writes`,
+        'refusing API writes is a later slice (5); only "api" is implemented — omit the key or use "api"',
+      );
+    }
   }
   if (config.storage.driver === "postgres") {
     throw new ReservedConfigError(
@@ -135,6 +198,23 @@ function checkReserved(raw: Record<string, unknown>, config: UnderstudyConfig): 
 function resolveSpec(spec: string, configDir: string): string {
   if (URL_LIKE.test(spec) || isAbsolute(spec)) return spec;
   return resolve(configDir, spec);
+}
+
+/** Fill the documented `onDelete: restrict` default on every pinned relation. */
+function normaliseEntities(entities: Record<string, EntityConfig>): Record<string, EntityConfig> {
+  const out: Record<string, EntityConfig> = {};
+  for (const [name, entity] of Object.entries(entities)) {
+    const relations = entity.relations
+      ? Object.fromEntries(
+          Object.entries(entity.relations).map(([field, relation]) => [
+            field,
+            { to: relation.to, onDelete: relation.onDelete ?? "restrict" },
+          ]),
+        )
+      : undefined;
+    out[name] = { ...entity, ...(relations ? { relations } : {}) };
+  }
+  return out;
 }
 
 /** Parse config text that came from `source` (a path, used only for messages and resolution). */
@@ -162,9 +242,19 @@ export function parseConfig(text: string, source: string): UnderstudyConfig {
   const config = merged as unknown as UnderstudyConfig;
   checkReserved(raw, config);
 
+  const baseDir = dirname(resolve(source));
+  const rawPaths = config.paths as unknown as PathsConfig;
   return {
     ...config,
-    spec: resolveSpec(config.spec, dirname(resolve(source))),
+    spec: resolveSpec(config.spec, baseDir),
+    baseDir,
+    paths: {
+      static: resolve(baseDir, rawPaths.static),
+      imports: resolve(baseDir, rawPaths.imports),
+      dynamic: resolve(baseDir, rawPaths.dynamic),
+      behavior: resolve(baseDir, rawPaths.behavior),
+    },
+    entities: normaliseEntities(config.entities),
   };
 }
 

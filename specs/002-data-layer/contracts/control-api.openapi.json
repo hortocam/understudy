@@ -1,0 +1,626 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Understudy Control API",
+    "version": "0.2.0",
+    "description": "Control surface for a running understudy mock. Every capability of the tool is reachable here; the CLI is a client of this API and adds no logic of its own.\n",
+    "x-served-source": "This document is a CHECKED-IN artefact, not generated from the implementation. The running control plane serves it byte-identical; a test asserts that (a drift check). If a served description were generated from the code it could never disagree with the implementation, which is the opposite of a contract.\n",
+    "x-prefix": "Every path below is relative to the configured reserved prefix (default /__understudy). The prefix is composed as prefix + path and carries no trailing slash.\n",
+    "x-extends": "specs/001-slice-1-core/contracts/control-api.openapi.json — slice 2 EXTENDS the slice-1 contract (adds POST /generate and its schemas); slice 1's file is kept as history and is never edited.\n"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "getHealth",
+        "summary": "Liveness and store reachability",
+        "responses": {
+          "200": {
+            "description": "The mock is alive",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "status",
+                    "store"
+                  ],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "const": "ok"
+                    },
+                    "store": {
+                      "type": "object",
+                      "required": [
+                        "reachable"
+                      ],
+                      "properties": {
+                        "reachable": {
+                          "type": "boolean"
+                        },
+                        "path": {
+                          "type": "string"
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/operations": {
+      "get": {
+        "operationId": "listOperations",
+        "summary": "The live operations and the not-implemented ones",
+        "responses": {
+          "200": {
+            "description": "Both sets, so a caller can explain a 501 it received",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "live",
+                    "notImplemented"
+                  ],
+                  "properties": {
+                    "live": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/OperationRef"
+                      }
+                    },
+                    "notImplemented": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/OperationRef"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/reset": {
+      "post": {
+        "operationId": "reset",
+        "summary": "Reset the mock",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "wipe"
+                    ],
+                    "default": "wipe"
+                  },
+                  "entities": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Omit to reset every entity."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The reset ran",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "mode",
+                    "removed"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "mode": {
+                      "type": "string"
+                    },
+                    "removed": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer"
+                      },
+                      "description": "Rows removed, keyed by entity name."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/MalformedRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/requests": {
+      "get": {
+        "operationId": "listRequests",
+        "summary": "The request log",
+        "parameters": [
+          {
+            "name": "method",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "live",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matching requests, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "requests",
+                    "total"
+                  ],
+                  "properties": {
+                    "total": {
+                      "type": "integer"
+                    },
+                    "requests": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RequestLogEntry"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/MalformedRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "operationId": "getControlDocument",
+        "summary": "This document",
+        "description": "Serves the checked-in control-API contract byte-identical. Declared here as application/json carrying an OpenAPI document, so a consumer can fetch it and generate a client without a second out-of-band source.\n",
+        "responses": {
+          "200": {
+            "description": "The control API's own OpenAPI document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenApiDocument"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/teardown": {
+      "post": {
+        "operationId": "teardown",
+        "summary": "Stop serving and release the port",
+        "description": "Idempotent: a second call to a mock already tearing down or gone returns the same success answer rather than a destructive failure.\n",
+        "responses": {
+          "200": {
+            "description": "Shutdown initiated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/generate": {
+      "post": {
+        "operationId": "generate",
+        "summary": "Apply a named generation recipe",
+        "description": "Generates the recipe's records into the running mock, in foreign-key order, and reports what was created by collection and origin (FR-021, FR-004). A recipe applied to a store whose generation marker already matches (same recipe, seed and config) is a no-op and says so; a marker that differs is a 409 naming the mismatch (use reset first). Fixture rows are never touched.\n",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The generation ran, or was already applied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerateResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/MalformedRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/UnknownRecipe"
+          },
+          "409": {
+            "$ref": "#/components/responses/GenerationConflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/GenerationRefused"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/{unknown}": {
+      "get": {
+        "operationId": "unknownControlOperation",
+        "summary": "Any other path under the reserved prefix",
+        "description": "A request under the reserved prefix that is not a control operation is answered as an unknown CONTROL operation and is never routed into the mocked surface. This entry is documentation for that behaviour; it is not a route the mocked surface can shadow.\n",
+        "parameters": [
+          {
+            "name": "unknown",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "404": {
+            "$ref": "#/components/responses/UnknownControlOperation"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "responses": {
+      "MalformedRequest": {
+        "description": "The request body or parameters could not be read",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ControlError"
+            }
+          }
+        }
+      },
+      "UnknownControlOperation": {
+        "description": "No such control operation under the reserved prefix",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ControlError"
+            }
+          }
+        }
+      },
+      "InternalError": {
+        "description": "The control operation failed",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ControlError"
+            }
+          }
+        }
+      },
+      "UnknownRecipe": {
+        "description": "The named recipe does not exist; the message names it and lists the available recipes",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ControlError"
+            }
+          }
+        }
+      },
+      "GenerationConflict": {
+        "description": "The store already holds generated records from a different recipe, seed or configuration; reset first",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ControlError"
+            }
+          }
+        }
+      },
+      "GenerationRefused": {
+        "description": "Generation refused with a named cause (an invariant that cannot be met, an unsatisfiable schema, an empty parent collection)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ControlError"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "ControlError": {
+        "type": "object",
+        "required": [
+          "error",
+          "message"
+        ],
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "A stable short code, e.g. malformed_request or unknown_control_operation."
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable, and names the offending field or path."
+          },
+          "field": {
+            "type": "string",
+            "description": "The offending input, when the error is attributable to one."
+          }
+        }
+      },
+      "OperationRef": {
+        "type": "object",
+        "required": [
+          "method",
+          "path"
+        ],
+        "properties": {
+          "method": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "operationId": {
+            "type": "string"
+          },
+          "entity": {
+            "type": "string"
+          }
+        }
+      },
+      "RequestLogEntry": {
+        "type": "object",
+        "required": [
+          "at",
+          "method",
+          "path",
+          "status",
+          "live"
+        ],
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "method": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          },
+          "live": {
+            "type": "boolean"
+          },
+          "durationMs": {
+            "type": "integer"
+          }
+        }
+      },
+      "OpenApiDocument": {
+        "type": "object",
+        "description": "An OpenAPI 3.1 document. Declared permissively: describing the full OpenAPI meta-schema here would be a second copy of it, and a copy that can go stale is worse than a permissive reference to the real one.\n",
+        "required": [
+          "openapi",
+          "info",
+          "paths"
+        ],
+        "properties": {
+          "openapi": {
+            "type": "string"
+          },
+          "info": {
+            "type": "object"
+          },
+          "paths": {
+            "type": "object"
+          }
+        },
+        "additionalProperties": true
+      },
+      "GenerateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "recipe": {
+            "type": "string",
+            "description": "Recipe name (a file under paths.dynamic, without extension). Omit to use the configured recipe."
+          },
+          "seed": {
+            "type": "integer",
+            "description": "Overrides the recipe's and the configuration's seed."
+          }
+        }
+      },
+      "GenerateResult": {
+        "type": "object",
+        "required": [
+          "ok",
+          "recipe",
+          "seed",
+          "regenerated",
+          "clock",
+          "created",
+          "provenance"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "recipe": {
+            "type": "string"
+          },
+          "seed": {
+            "type": "integer"
+          },
+          "regenerated": {
+            "type": "boolean",
+            "description": "false when the store already held this recipe+seed+config and nothing was generated."
+          },
+          "clock": {
+            "type": "object",
+            "required": [
+              "mode",
+              "pinned"
+            ],
+            "properties": {
+              "mode": {
+                "type": "string"
+              },
+              "pinned": {
+                "type": "boolean",
+                "description": "false means time-derived values differ between runs (clock-unpinned)."
+              },
+              "instant": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          },
+          "created": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer"
+              }
+            },
+            "description": "Records by collection, then by origin (static, imported, generated, runtime)."
+          },
+          "counts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer"
+              }
+            },
+            "description": "Records by collection, then by origin (static, imported, generated, runtime)."
+          },
+          "provenance": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer"
+                }
+              }
+            },
+            "description": "Per collection, per field: how many values each precedence level supplied (FR-010)."
+          },
+          "redraws": {
+            "type": "integer",
+            "description": "Invariant redraws spent (FR-013)."
+          }
+        }
+      }
+    }
+  }
+}

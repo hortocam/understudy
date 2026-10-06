@@ -1,0 +1,4 @@
+entity: Venue
+rows:
+  - { id: 1, name: "Test Arena", city: "Boston", state: "MA", timezone: "America/New_York" }
+  - { id: 2, name: "Harbor Hall", city: "New York", state: "NY", timezone: "America/New_York" }

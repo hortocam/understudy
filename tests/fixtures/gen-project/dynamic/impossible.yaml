@@ -1,0 +1,13 @@
+# A deliberately impossible invariant (FR-013): the run must fail loudly, naming the rule.
+seed: 1
+entities:
+  Venue: { count: 2 }
+  Event:
+    perParent: { entity: Venue, range: [1, 2] }
+  Inventory:
+    perParent: { entity: Event, range: [1, 2] }
+    fields:
+      cost:  { faker: "number.int", min: 20, max: 400 }
+      price: { expr: "cost * $uniform(0.5, 2.5)" }
+    constraints: ["price > 1000000"]
+    redraws: 5

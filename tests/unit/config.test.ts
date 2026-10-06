@@ -12,7 +12,11 @@ import {
   UnderstudyError,
 } from "../../src/errors.js";
 
+// Slice 2's contract is authoritative (plan → "Known integration point"); slice 1's file stays as history.
 const contractPath = fileURLToPath(
+  new URL("../../specs/002-data-layer/contracts/config.schema.yaml", import.meta.url),
+);
+const slice1ContractPath = fileURLToPath(
   new URL("../../specs/001-slice-1-core/contracts/config.schema.yaml", import.meta.url),
 );
 
@@ -28,7 +32,23 @@ function capture(fn: () => unknown): unknown {
 describe("config schema", () => {
   it("keeps the inlined schema identical to the checked-in contract", () => {
     const contract = JSON.parse(readFileSync(contractPath, "utf8")) as unknown;
-    expect(configSchema).toEqual(contract);
+    // byte-for-byte (key order included), as the control drift test does — not merely deep-equal
+    expect(JSON.stringify(configSchema)).toBe(JSON.stringify(contract));
+  });
+
+  it("derives from slice 2's contract, and leaves slice 1's file in place as history", () => {
+    const slice1 = JSON.parse(readFileSync(slice1ContractPath, "utf8")) as { properties: Record<string, unknown> };
+    // slice 1's contract predates the extended keys: it is history, never edited
+    expect(slice1.properties.entities).toBeUndefined();
+    expect((configSchema as { properties: Record<string, unknown> }).properties.entities).toBeDefined();
+    expect(readFileSync(new URL("../../scripts/generate-config-schema.mjs", import.meta.url), "utf8")).toContain(
+      "specs/002-data-layer/contracts/config.schema.yaml",
+    );
+  });
+
+  it("states the default seed in the contract (D9, constitution IX)", () => {
+    const seed = (configSchema as { properties: { seed: { default?: unknown } } }).properties.seed;
+    expect(seed.default).toBe(0);
   });
 });
 
@@ -120,12 +140,17 @@ describe("reserved keys refuse by name", () => {
     expect((error as Error).message).toContain("signing");
   });
 
-  it("refuses clock", () => {
+  it("refuses clock.mode: virtual, but accepts the real clock and a pinned start (slice 2)", () => {
     const error = capture(() =>
       parseConfig("spec: ./api.yaml\noperations: [GET /pets]\nclock:\n  mode: virtual\n", "c.yaml"),
     );
     expect(error).toBeInstanceOf(ReservedConfigError);
-    expect((error as Error).message).toContain("clock");
+    expect((error as Error).message).toContain("clock.mode");
+    const ok = parseConfig(
+      "spec: ./api.yaml\noperations: [GET /pets]\nclock:\n  mode: real\n  start: 2026-01-02T03:04:05Z\n",
+      "c.yaml",
+    );
+    expect(ok.clock).toEqual({ mode: "real", start: "2026-01-02T03:04:05Z" });
   });
 
   it("refuses storage.driver: postgres", () => {
@@ -149,5 +174,45 @@ describe("spec path resolution", () => {
   it("leaves a URL spec untouched", () => {
     const config = parseConfig("spec: https://example.test/openapi.json\noperations: [getPets]\n", "c.yaml");
     expect(config.spec).toBe("https://example.test/openapi.json");
+  });
+});
+describe("wrong-shaped sections are refused, never defaulted (FR-005)", () => {
+  const base = "spec: ./openapi.yaml\noperations:\n  - GET /x\n";
+  const cases: Array<[string, string, string]> = [
+    ["seed", 'seed: "42"\n', "seed"],
+    ["paths", "paths: 5\n", "paths"],
+    ["inference", "inference: []\n", "inference"],
+    ["entities", "entities: []\n", "entities"],
+    ["server", "server: 3\n", "server"],
+    ["control", "control: yes\n", "control"],
+    ["storage", "storage: [a]\n", "storage"],
+    ["ids", "ids: nope\n", "ids"],
+  ];
+  for (const [key, text, named] of cases) {
+    it(`refuses a malformed \`${key}\`, naming it`, () => {
+      const error = capture(() => parseConfig(base + text, "/tmp/understudy.yaml"));
+      expect(error).toBeInstanceOf(ConfigInvalidError);
+      expect((error as Error).message).toContain(named);
+    });
+  }
+
+  it("still defaults an ABSENT section", () => {
+    const config = parseConfig(base, "/tmp/understudy.yaml");
+    expect(config.seed).toBe(0);
+  });
+});
+
+describe("`entities.<X>.writes: actions-only` is reserved, not silently inert (constitution IX)", () => {
+  it("refuses it, naming the key", () => {
+    const error = capture(() =>
+      parseConfig("spec: ./openapi.yaml\noperations:\n  - GET /x\nentities:\n  Order: { writes: actions-only }\n", "/tmp/understudy.yaml"),
+    );
+    expect(error).toBeInstanceOf(ReservedConfigError);
+    expect((error as Error).message).toContain("entities.Order.writes");
+  });
+
+  it("still accepts `writes: api`", () => {
+    const config = parseConfig("spec: ./openapi.yaml\noperations:\n  - GET /x\nentities:\n  Order: { writes: api }\n", "/tmp/understudy.yaml");
+    expect(config.entities.Order?.writes).toBe("api");
   });
 });

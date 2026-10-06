@@ -20,7 +20,7 @@ import { parseConfig } from "../../src/config/load.js";
 import { INVENTORY_OPERATIONS, fixturePath, newStoreDir, storePath } from "../helpers/mock.js";
 
 const contractPath = fileURLToPath(
-  new URL("../../specs/001-slice-1-core/contracts/control-api.openapi.json", import.meta.url),
+  new URL("../../specs/002-data-layer/contracts/control-api.openapi.json", import.meta.url),
 );
 
 let mock: RunningMock | undefined;

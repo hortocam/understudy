@@ -11,6 +11,9 @@
  * also exposes as `report` — so they cannot disagree.
  */
 import { fileURLToPath } from "node:url";
+import { createClock } from "../../src/clock.js";
+import { buildGenerationPlan } from "../../src/data/plan.js";
+import type { LoadedRecipe } from "../../src/config/layers/recipes.js";
 import { describe, expect, it } from "vitest";
 import { createLogger, renderStartupReport, type Logger } from "../../src/logging.js";
 import { loadSpec } from "../../src/spec/load.js";
@@ -183,5 +186,112 @@ describe("the running mock emits both renderings from one report (FR-024)", () =
       await mock?.close();
       mock = undefined;
     }
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Slice 2 (T036, FR-004/006/007/008/019, SC-005): the report carries the POPULATION facts.
+// ---------------------------------------------------------------------------------------------
+
+async function slice2Report(fixtureName: string, extra: Partial<Parameters<typeof buildStartupReport>[0]> = {}) {
+  const loaded = await loadSpec(fixture(fixtureName));
+  const live = collectOperations(loaded.document);
+  const model = deriveModel(loaded.document, live);
+  const plan = buildGenerationPlan({ model });
+  const report = buildStartupReport({ spec: loaded, live, notSelected: [], model, plan, ...extra });
+  return { report, model, text: renderStartupReport(report) };
+}
+
+describe("startup report — slice 2 population facts (FR-007, SC-005)", () => {
+  it("lists each collection with its identity space and paging style", async () => {
+    const { text, report } = await slice2Report("spaces-api.yaml");
+    for (const r of report.resources) {
+      expect(text).toContain(`${r.name} (`);
+    }
+    expect(text).toMatch(/UuidThing .*space=uuid/);
+    expect(text).toMatch(/Formatted .*space=formatted/);
+    expect(text).toMatch(/Opaque .*space=opaque/);
+    expect(text).toMatch(/BigInt .*paging=offset-limit/);
+    const cursor = await slice2Report("cursor-schema-api.yaml");
+    expect(cursor.text).toMatch(/CursorThing .*paging=cursor-in-schema/);
+    expect(cursor.text).toMatch(/PageThing .*paging=page-size/);
+    expect(cursor.text).toMatch(/PlainThing .*paging=none-declared/);
+  });
+
+  it("lists undetermined links SEPARATELY, with their candidates, and does not render them as decided", async () => {
+    const { text, report } = await slice2Report("collisions-api.yaml");
+    const decided = text.split("\n").filter((l) => /^ {2}\w+ -> \w+ via /.test(l));
+    expect(decided.some((l) => l.includes("Event -> Venue via venueId"))).toBe(true);
+    expect(decided.some((l) => l.includes("Order -> Event via eventId"))).toBe(false);
+    const section = text.slice(text.indexOf("undetermined links"));
+    expect(section).toContain("undetermined links (8)");
+    expect(section).toContain("Order.eventId");
+    expect(section).toMatch(/candidates: eventId, primaryEventId, viagogoEventId/);
+    expect(section).toContain("Customer.externalId");
+    expect(section).toMatch(/pin .*entities\.Order\.relations/);
+    expect(report.relationships.filter((r) => r.status === "undetermined")).toHaveLength(8);
+  });
+
+  it("reports the generation order and any cycle with its unresolved links", async () => {
+    const { text } = await slice2Report("cycle-api.yaml");
+    expect(text).toContain("generation order: Alpha, Beta, Gamma, Delta, Omega");
+    expect(text).toContain("cycle (Alpha, Beta, Gamma)");
+    expect(text).toContain("unresolved: Alpha.betaId, Beta.gammaId");
+  });
+
+  it("states the clock mode, and WARNS when it is unpinned (FR-019, D8)", async () => {
+    const pinned = await slice2Report("collisions-api.yaml", { clock: createClock({ start: "2026-01-02T03:04:05.000Z" }) });
+    expect(pinned.text).toContain("clock: real, pinned to 2026-01-02T03:04:05.000Z");
+    expect(pinned.report.ambiguities.some((a) => a.kind === "clock-unpinned")).toBe(false);
+    const unpinned = await slice2Report("collisions-api.yaml", { clock: createClock() });
+    expect(unpinned.text).toMatch(/clock: real, unpinned/);
+    expect(unpinned.report.ambiguities.find((a) => a.kind === "clock-unpinned")?.detail).toMatch(/differ between runs/);
+  });
+
+  it("states the seed and the selected recipe, and the configured counts", async () => {
+    const loaded = await loadSpec(fixture("collisions-api.yaml"));
+    const live = collectOperations(loaded.document);
+    const model = deriveModel(loaded.document, live);
+    const recipe: LoadedRecipe = {
+      name: "ci-small",
+      file: "dynamic/ci-small.yaml",
+      dir: "/",
+      entities: { Venue: { count: 3 }, Event: { perParent: { entity: "Venue", range: [2, 4] } } },
+      generators: {},
+    };
+    const plan = buildGenerationPlan({ model, recipe });
+    const text = renderStartupReport(buildStartupReport({ spec: loaded, live, notSelected: [], model, plan, seed: 42, recipe: "ci-small" }));
+    expect(text).toContain("seed: 42");
+    expect(text).toContain("recipe: ci-small");
+    expect(text).toContain("Venue: 3 records");
+    expect(text).toContain("Event: 2..4 per Venue (via venueId, uniform)");
+  });
+
+  it("states the records by origin once the store is populated (FR-004)", async () => {
+    const { text } = await slice2Report("collisions-api.yaml", { origins: { Venue: { static: 1, generated: 3 }, Event: { runtime: 2 } } });
+    expect(text).toContain("records by origin");
+    expect(text).toContain("Venue: static 1, generated 3");
+    expect(text).toContain("Event: runtime 2");
+  });
+
+  it("names the property each index exists for and the declared parameter that caused it", async () => {
+    const { report, text } = await slice2Report("collisions-api.yaml");
+    expect(report.indexes).toEqual([]); // limit/offset declare no filterable property
+    const loaded = await loadSpec(fixture("shop-api.yaml"));
+    const live = collectOperations(loaded.document);
+    const model = deriveModel(loaded.document, live);
+    const shop = buildStartupReport({ spec: loaded, live, notSelected: [], model });
+    expect(shop.indexes).toContainEqual({ resource: "Inventory", field: "eventId", reason: 'filter parameter "eventId"' });
+    expect(renderStartupReport(shop)).toContain('Inventory.eventId (filter parameter "eventId")');
+    void text;
+  });
+
+  it("emits the same facts as one structured log line (one source, two renderings)", async () => {
+    const { report } = await slice2Report("collisions-api.yaml");
+    const logged: string[] = [];
+    createLogger({ write: (l) => logged.push(l) }).info("startup report", { report });
+    const parsed = JSON.parse(logged[0] as string) as { report: typeof report };
+    expect(parsed.report.relationships.filter((r) => r.status === "undetermined")).toHaveLength(8);
+    expect(parsed.report.plan?.order).toEqual(report.plan?.order);
   });
 });

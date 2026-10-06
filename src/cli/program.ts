@@ -12,6 +12,7 @@ import { existsSync } from "node:fs";
 import { Command, CommanderError } from "commander";
 import { loadConfig, type UnderstudyConfig } from "../config/load.js";
 import { createMock } from "../index.js";
+import { scaffoldProject } from "../init.js";
 import { renderRefusal } from "../logging.js";
 import {
   ControlClient,
@@ -60,6 +61,13 @@ function resolveControlUrl(options: { controlUrl?: string; config?: string }, io
 function parsePort(value: string): number {
   if (!/^\d+$/.test(value) || Number(value) > 65535) {
     throw new CommanderError(1, "ustdy.badPort", `error: "${value}" is not a valid port`);
+  }
+  return Number(value);
+}
+
+function parseSeed(value: string): number {
+  if (!/^-?\d+$/.test(value)) {
+    throw new CommanderError(1, "ustdy.badSeed", `error: "${value}" is not a valid seed (an integer)`);
   }
   return Number(value);
 }
@@ -163,6 +171,8 @@ export function buildProgram(io: CliIo): Command {
       collect,
       [] as string[],
     )
+    .option("--recipe <name>", "generation recipe to apply (a file under paths.dynamic; overrides the config's recipe)")
+    .option("--seed <n>", "global seed (overrides the config's and the recipe's seed; default 0)", parseSeed)
     .action(
       async (options: {
         config?: string;
@@ -170,6 +180,8 @@ export function buildProgram(io: CliIo): Command {
         controlPort?: number;
         controlUrl?: string;
         operation: string[];
+        recipe?: string;
+        seed?: number;
       }) => {
         const configPath = options.config ?? io.env.USTDY_CONFIG ?? DEFAULT_CONFIG;
         let config: UnderstudyConfig;
@@ -182,6 +194,9 @@ export function buildProgram(io: CliIo): Command {
         // FR-020: fold the start-time selection into the config createMock sees, so an
         // explicit choice overrides the file's `operations` without any engine-side change.
         config = { ...config, operations: resolveSelection(options, io.env, config) };
+        // Slice 2: the start-time recipe and seed override the file's, the same way.
+        if (options.recipe !== undefined) config = { ...config, recipe: options.recipe };
+        if (options.seed !== undefined) config = { ...config, seedOverride: options.seed };
 
         let mock;
         try {
@@ -214,6 +229,42 @@ export function buildProgram(io: CliIo): Command {
       io.out(`torn down: ${client.baseUrl} released`);
     },
   );
+
+  program
+    .command("init")
+    .description("scaffold the configuration layers and understudy.yaml for a specification, and print the inferred collection report")
+    .requiredOption("--spec <path-or-url>", "the OpenAPI document (a URL is the only network call the tool makes)")
+    .option("--dir <path>", "project directory (created if absent)", ".")
+    .option("--force", "replace files that already exist")
+    .action(async (options: { spec: string; dir: string; force?: boolean }) => {
+      const result = await scaffoldProject({ spec: options.spec, dir: options.dir, ...(options.force ? { force: true } : {}) });
+      io.out(result.report);
+    });
+
+  clientCommand("generate", "apply a named generation recipe to the running mock and report what it created")
+    .option("--recipe <name>", "recipe to apply (default: the mock's configured recipe)")
+    .option("--seed <n>", "seed for this run (overrides the recipe's and the configuration's)", parseSeed)
+    .action(async (options: { config?: string; controlUrl?: string; recipe?: string; seed?: number }) => {
+      const answer = await new ControlClient(resolveControlUrl(options, io)).generate({
+        ...(options.recipe !== undefined ? { recipe: options.recipe } : {}),
+        ...(options.seed !== undefined ? { seed: options.seed } : {}),
+      });
+      const clock = answer.clock.pinned ? `clock ${answer.clock.mode} pinned` : `clock ${answer.clock.mode}, unpinned (timestamps differ between runs)`;
+      io.out(
+        answer.regenerated
+          ? `generated: recipe ${answer.recipe}, seed ${answer.seed}, ${clock}`
+          : `already applied: recipe ${answer.recipe}, seed ${answer.seed} — the store holds this recipe, seed and configuration; nothing regenerated`,
+      );
+      const rows = answer.regenerated ? answer.created : (answer.counts ?? {});
+      io.out(answer.regenerated ? "created, by collection and origin:" : "records in the store, by collection and origin:");
+      for (const [collection, byOrigin] of Object.entries(rows)) {
+        const detail = Object.entries(byOrigin).map(([origin, n]) => `${origin} ${n}`).join(", ");
+        const totals = answer.regenerated && answer.counts?.[collection]
+          ? `  (total: ${Object.entries(answer.counts[collection] as Record<string, number>).map(([origin, n]) => `${origin} ${n}`).join(", ")})`
+          : "";
+        io.out(`  ${collection}: ${detail}${totals}`);
+      }
+    });
 
   const ops = program.command("ops").description("operations of the running mock");
   ops

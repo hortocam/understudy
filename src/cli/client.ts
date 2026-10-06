@@ -52,6 +52,22 @@ export interface ResetAnswer {
   removed: Record<string, number>;
 }
 
+export interface GenerateRequest {
+  recipe?: string;
+  seed?: number;
+}
+
+export interface GenerateAnswer {
+  ok: boolean;
+  recipe: string;
+  seed: number;
+  regenerated: boolean;
+  clock: { mode: string; pinned: boolean; instant?: string };
+  created: Record<string, Record<string, number>>;
+  counts?: Record<string, Record<string, number>>;
+  redraws?: number;
+}
+
 export interface RequestsQuery {
   method?: string;
   status?: string;
@@ -102,6 +118,10 @@ export class ControlClient {
 
   async reset(request: ResetRequest): Promise<ResetAnswer> {
     return (await this.#call("POST", "/reset", request)) as ResetAnswer;
+  }
+
+  async generate(request: GenerateRequest): Promise<GenerateAnswer> {
+    return (await this.#call("POST", "/generate", request)) as GenerateAnswer;
   }
 
   async requests(query: RequestsQuery): Promise<RequestsAnswer> {

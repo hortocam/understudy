@@ -1,0 +1,13 @@
+# A few thousand records across five collections (SC-008).
+seed: 7
+entities:
+  InventoryStatus: { count: 50 }
+  Venue: { count: 30 }
+  Event:
+    perParent: { entity: Venue, range: [20, 30] }
+  Inventory:
+    perParent: { entity: Event, range: [5, 8] }
+    fields:
+      price: { expr: "cost * $uniform(1.1, 2.5)" }
+    constraints: ["price >= cost"]
+  AuditNote: { count: 500 }

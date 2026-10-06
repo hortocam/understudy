@@ -17,7 +17,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:live": "vitest run --config vitest.live.config.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",
@@ -29,6 +30,7 @@
     "vitest": "^5.0.3"
   },
   "dependencies": {
+    "@faker-js/faker": "^10.6.0",
     "@scalar/json-magic": "^0.15.4",
     "@scalar/openapi-parser": "^0.29.10",
     "@scalar/openapi-upgrader": "^0.4.1",
@@ -37,6 +39,7 @@
     "better-sqlite3": "^13.0.3",
     "commander": "^15.0.0",
     "fastify": "^5.12.5",
+    "jsonata": "^2.2.2",
     "yaml": "^2.9.1"
   }
 }

@@ -18,7 +18,8 @@ export const SCHEMA_VERSION = "1";
  * therefore swallow such a resource's rows out of the unscoped wipe and `removeByOrigin`
  * (HANDOFF-p5-p7 §5 item 4). An explicit set removes the whole collision class.
  */
-export const META_TABLES: ReadonlySet<string> = new Set([META_TABLE, REQUESTS_TABLE]);
+export const ID_RANGES_TABLE = "_id_ranges";
+export const META_TABLES: ReadonlySet<string> = new Set([META_TABLE, REQUESTS_TABLE, ID_RANGES_TABLE]);
 
 /** Quote an SQL identifier, escaping embedded quotes. */
 export function quoteIdent(name: string): string {
@@ -41,20 +42,89 @@ export const REQUESTS_DDL = `CREATE TABLE IF NOT EXISTS ${quoteIdent(REQUESTS_TA
 );
 CREATE INDEX IF NOT EXISTS ${quoteIdent("_requests_at_idx")} ON ${quoteIdent(REQUESTS_TABLE)} (at);`;
 
+/**
+ * Per-collection identity reservations (data-model.md §3, D3): the space, the declared and
+ * reserved spans and the allocation cursor. `next` is TEXT because uuid and formatted
+ * identities are not integers. The runtime counter `id_seq:<resource>` stays in the meta table.
+ */
+export const ID_RANGES_DDL = `CREATE TABLE IF NOT EXISTS ${quoteIdent(ID_RANGES_TABLE)} (
+  resource   TEXT PRIMARY KEY,
+  id_space   TEXT NOT NULL,
+  declared   TEXT NOT NULL,
+  reserved   TEXT NOT NULL,
+  next       TEXT,
+  updated_at TEXT NOT NULL
+);`;
+
 /** The origin CHECK constraint, verbatim from data-model.md §2. */
 export const ORIGIN_CHECK = "origin IN ('static','imported','generated','runtime')";
 
-/** DDL for one derived resource's table, plus its origin index. */
-export function resourceDdl(resource: string): string {
-  const table = quoteIdent(resource);
-  return `CREATE TABLE IF NOT EXISTS ${table} (
+export interface ForeignKeyDdl {
+  field: string;
+  references: string;
+  onDelete: "restrict" | "cascade" | "setNull";
+}
+
+/** The real column that carries a link property, maintained by the store from the record body. */
+export function fkColumn(field: string): string {
+  return `fk_${field}`;
+}
+
+const ON_DELETE: Record<ForeignKeyDdl["onDelete"], string> = {
+  restrict: "RESTRICT",
+  cascade: "CASCADE",
+  setNull: "SET NULL",
+};
+
+/** `'$.<field>'` as an SQL string literal, quote-escaped (a document property name is untrusted text). */
+export function jsonPathLiteral(field: string): string {
+  return `'$.${field.replace(/'/g, "''")}'`;
+}
+
+/** The table-only DDL (no indexes/triggers), under `table`'s name. */
+export function resourceTableDdl(table: string, foreignKeys: ForeignKeyDdl[] = []): string {
+  const fkColumns = foreignKeys.map(
+    (fk) =>
+      `,\n  ${quoteIdent(fkColumn(fk.field))} TEXT REFERENCES ${quoteIdent(fk.references)}(id) ON DELETE ${ON_DELETE[fk.onDelete]}`,
+  );
+  return `CREATE TABLE IF NOT EXISTS ${quoteIdent(table)} (
   id         TEXT PRIMARY KEY,
   origin     TEXT NOT NULL CHECK (${ORIGIN_CHECK}),
   doc        TEXT NOT NULL,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS ${quoteIdent(`${resource}_origin_idx`)} ON ${table} (origin);`;
+  updated_at TEXT NOT NULL${fkColumns.join("")}
+);`;
+}
+
+/**
+ * Indexes and triggers for a resource table. `setNull` needs a trigger: SQLite's own SET NULL
+ * action nulls the hidden link column, and the record body must say the same thing.
+ */
+export function resourceAuxDdl(resource: string, foreignKeys: ForeignKeyDdl[] = [], indexes: string[] = []): string {
+  const table = quoteIdent(resource);
+  const out: string[] = [`CREATE INDEX IF NOT EXISTS ${quoteIdent(`${resource}_origin_idx`)} ON ${table} (origin);`];
+  for (const field of indexes) {
+    out.push(
+      `CREATE INDEX IF NOT EXISTS ${quoteIdent(`${resource}_${field}_idx`)} ON ${table} (json_extract(doc, ${jsonPathLiteral(field)}));`,
+    );
+  }
+  for (const fk of foreignKeys) {
+    out.push(`CREATE INDEX IF NOT EXISTS ${quoteIdent(`${resource}_${fkColumn(fk.field)}_idx`)} ON ${table} (${quoteIdent(fkColumn(fk.field))});`);
+    if (fk.onDelete === "setNull") {
+      const column = quoteIdent(fkColumn(fk.field));
+      out.push(
+        `CREATE TRIGGER IF NOT EXISTS ${quoteIdent(`${resource}_${fkColumn(fk.field)}_null`)} AFTER UPDATE OF ${column} ON ${table} ` +
+          `WHEN NEW.${column} IS NULL AND OLD.${column} IS NOT NULL ` +
+          `BEGIN UPDATE ${table} SET doc = json_set(doc, ${jsonPathLiteral(fk.field)}, json('null')) WHERE id = NEW.id; END;`,
+      );
+    }
+  }
+  return out.join("\n");
+}
+
+/** DDL for one derived resource's table, plus its origin index (slice 1's shape when no options). */
+export function resourceDdl(resource: string, foreignKeys: ForeignKeyDdl[] = [], indexes: string[] = []): string {
+  return `${resourceTableDdl(resource, foreignKeys)}\n${resourceAuxDdl(resource, foreignKeys, indexes)}`;
 }
 
 /** Columns of a resource table, in declaration order (asserted against data-model.md). */

@@ -12,8 +12,8 @@ export interface DocumentOperation {
   operation: Record<string, unknown>;
 }
 
-/** The two selector forms are peers (FR-002, amendment A2) — an entry's spelling decides. */
-export type SelectorForm = "method-path" | "operationId";
+/** The three selector forms are peers (FR-002, amendment A2) — an entry's spelling decides. */
+export type SelectorForm = "method-path" | "operationId" | "tag";
 
 /** How one configured selection entry resolved against the document (FR-023, A2). */
 export interface ResolvedSelectionEntry {
@@ -68,12 +68,24 @@ export interface ListParam {
   in: string;
   kind: ListParamKind;
   required: boolean;
+  /** The parameter's declared enum values, when it has them (a `sort` parameter's sortable fields). */
+  values?: string[];
+  /** A paging parameter's declared size cap (`maximum`, else `default`) — what one page can hold. */
+  pageCap?: number;
 }
+
+/** The identity space a collection's reserved range lives in (FR-017, Amendment D). */
+export type IdSpaceKind = "integer" | "uuid" | "formatted" | "opaque";
+
+/** How a collection pages (FR-015, Amendment C; the target's form is `cursor-in-schema`). */
+export type PagingStyleKind = "cursor-in-schema" | "offset-limit" | "page-size" | "none-declared";
 
 export interface Resource {
   name: string;
   collectionPath: string;
   instancePath?: string;
+  /** The path parameter that names an instance in `instancePath` (may differ from `idField`). */
+  instanceParam?: string;
   idField: string;
   idType: "integer" | "string";
   idPattern?: string;
@@ -81,6 +93,14 @@ export interface Resource {
   createSchema?: unknown;
   updateMode?: "merge" | "replace";
   listParams: ListParam[];
+  /** The identity space the reserved range lives in. */
+  idSpace: IdSpaceKind;
+  /** How the collection pages, from its list operation's parameters and response schema. */
+  pagingStyle: PagingStyleKind;
+  /** Properties the list operation filters on (a filter parameter's name). */
+  filterFields: string[];
+  /** Properties the list operation can sort by (the enum of a sort parameter, when declared). */
+  sortFields: string[];
   operations: ResourceOperations;
   nameSource: "schema-title" | "path-segment";
 }
@@ -89,10 +109,19 @@ export type RelationshipEvidence = "configured" | "extension" | "convention" | "
 
 export interface Relationship {
   from: string;
+  /** The target collection; empty for an undetermined link that proposes no single target. */
   to: string;
   field: string;
   cardinality: "one" | "many";
   evidence: RelationshipEvidence;
+  /**
+   * `decided` when exactly one candidate survives the evidence order; `undetermined` when the
+   * convention fired but did not decide (FR-006). An undetermined link is reported and NOT acted
+   * on: it orders nothing and produces no foreign key.
+   */
+  status: "decided" | "undetermined";
+  /** The competing properties/targets that made it ambiguous (undetermined links only). */
+  candidates?: string[];
 }
 
 export type AmbiguityKind =
@@ -101,12 +130,24 @@ export type AmbiguityKind =
   | "no-list-parameters"
   | "identity-field-unknown"
   | "identity-pattern-unsupported"
-  | "ambiguous-relationship";
+  | "ambiguous-relationship"
+  | "undetermined-link"
+  | "identity-space-unreservable"
+  | "paging-not-exercised"
+  | "unpaged-large-collection"
+  | "clock-unpinned"
+  | "lookup-only"
+  | "import-source"
+  | "duplicate-resource-name"
+  | "conformance-unchecked"
+  | "cascade-removes-fixtures";
 
 export interface Ambiguity {
   kind: AmbiguityKind;
   path?: string;
   operationId?: string;
+  /** A stable key for what this is about (`Order.eventId`, a collection name), for reports and goldens. */
+  subject?: string;
   detail: string;
 }
 
@@ -136,6 +177,50 @@ export interface LoadedSpec {
   document: Record<string, unknown>;
 }
 
+/** What generation will do, in the report's own terms (structurally satisfied by `data/plan.ts`'s plan). */
+export interface PlanSummary {
+  order: string[];
+  cycles: Array<{ members: string[]; unresolved: string[] }>;
+  counts: Record<
+    string,
+    | { kind: "absolute"; n: number }
+    | { kind: "perParent"; parent: string; field: string; range: [number, number]; distribution: string }
+    | { kind: "import" }
+  >;
+}
+
+/** A property indexed because the document declares it filterable/sortable, and the parameter that caused it. */
+export interface IndexReason {
+  resource: string;
+  field: string;
+  reason: string;
+}
+
+/** A collection's identity space and reserved range, as reported at startup (FR-017). */
+export interface IdentityReport {
+  resource: string;
+  space: IdSpaceKind;
+  declared: string;
+  reserved: string;
+  unreservable: boolean;
+}
+
+/** What the generation run did (FR-021): counts by collection and origin, and where each value came from (FR-010). */
+export interface GenerationReport {
+  recipe: string;
+  seed: number;
+  /** False when the store already held this recipe+seed+configuration and nothing was generated (D7). */
+  regenerated: boolean;
+  /** Records this run created, by collection then origin. */
+  created: Record<string, Partial<Record<"static" | "imported" | "generated" | "runtime", number>>>;
+  /** For each collection and field: how many values each precedence level supplied. */
+  provenance: Record<string, Record<string, Record<string, number>>>;
+  /** Fields whose values were chosen by a heuristic or a type default (levels 5–6) — the report says so. */
+  fallbacks: Array<{ collection: string; field: string; rule: string; level: number; count: number }>;
+  redraws: number;
+  notes: string[];
+}
+
 export interface StartupReport {
   spec: {
     source: string;
@@ -143,7 +228,18 @@ export interface StartupReport {
     sourceVersion: string;
     contentHash: string;
   };
-  clock: { mode: "real" };
+  clock: { mode: "real"; pinned?: boolean; instant?: string };
+  /** The global seed in force (0 when none is configured — there is no hidden entropy). */
+  seed?: number;
+  /** The selected recipe, when one is. */
+  recipe?: string;
+  plan?: PlanSummary;
+  /** Per-collection identity space and reserved range. */
+  identity?: IdentityReport[];
+  generation?: GenerationReport;
+  indexes: IndexReason[];
+  /** Record counts per collection and origin, once the store is populated (FR-004). */
+  origins?: Record<string, Partial<Record<"static" | "imported" | "generated" | "runtime", number>>>;
   live: OperationRef[];
   notSelected: OperationRef[];
   /** Which selector form resolved each live operation (FR-023; amendment A2). */

@@ -1,0 +1,48 @@
+openapi: 3.0.1
+info:
+  title: Duplicate names API
+  version: 1.0.0
+  description: >
+    Shape-faithful to the measured target (docs/05): distinct collections whose derived names
+    collide — two share a schema title (Invoice) yet differ in identity field and paging, and two
+    untitled collections collapse to the same last path segment (Tag).
+paths:
+  /invoices:
+    get:
+      parameters:
+        - { name: limit, in: query, schema: { type: integer } }
+        - { name: offset, in: query, schema: { type: integer } }
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/InvoiceA" } } } } } }
+  /invoices/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+    get:
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/InvoiceA" } } } } }
+  /accounts/{accountId}/invoices:
+    parameters: [{ name: accountId, in: path, required: true, schema: { type: string } }]
+    get:
+      parameters:
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: pageSize, in: query, schema: { type: integer } }
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/InvoiceB" } } } } } }
+  /accounts/{accountId}/invoices/{invoiceId}:
+    parameters:
+      - { name: accountId, in: path, required: true, schema: { type: string } }
+      - { name: invoiceId, in: path, required: true, schema: { type: string } }
+    get:
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/InvoiceB" } } } } }
+  /shops/tags:
+    get:
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { type: object, properties: { id: { type: integer }, label: { type: string } } } } } } } }
+  /blogs/tags:
+    get:
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { type: object, properties: { id: { type: integer }, slug: { type: string } } } } } } } }
+components:
+  schemas:
+    InvoiceA:
+      title: Invoice
+      type: object
+      properties: { id: { type: integer }, total: { type: number } }
+    InvoiceB:
+      title: Invoice
+      type: object
+      properties: { invoiceId: { type: string }, accountId: { type: string }, memo: { type: string } }

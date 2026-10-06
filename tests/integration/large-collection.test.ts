@@ -20,7 +20,7 @@ import { createMock, type RunningMock } from "../../src/index.js";
 import { createLogger } from "../../src/logging.js";
 import { parseConfig } from "../../src/config/load.js";
 import { SqliteStore } from "../../src/store/sqlite.js";
-import type { ListQuery, Origin, RequestLogEntry, Store, StoreOptions, StoredRecord } from "../../src/store/index.js";
+import type { IdRange, ListQuery, NewRecord, Origin, RequestLogEntry, ResourceOptions, Store, StoreOptions, StoredRecord } from "../../src/store/index.js";
 import { fixturePath } from "../helpers/mock.js";
 
 let mock: RunningMock | undefined;
@@ -79,8 +79,36 @@ class CountingStore implements Store {
   ensureSchema(): void {
     this.inner.ensureSchema();
   }
-  ensureResource(resource: string): void {
-    this.inner.ensureResource(resource);
+  ensureResource(resource: string, options?: ResourceOptions): void {
+    this.inner.ensureResource(resource, options);
+  }
+  // Slice-2 seam additions: pure delegation (the counting is about reads of record bodies).
+  transaction<T>(fn: () => T): T {
+    return this.inner.transaction(fn);
+  }
+  insertMany(records: NewRecord[]): void {
+    this.inner.insertMany(records);
+  }
+  countByOrigin(): Record<string, Partial<Record<Origin, number>>> {
+    return this.inner.countByOrigin();
+  }
+  listIdentities(resource: string): string[] {
+    return this.inner.listIdentities(resource);
+  }
+  reserveRange(range: IdRange): void {
+    this.inner.reserveRange(range);
+  }
+  readRange(resource: string): IdRange | undefined {
+    return this.inner.readRange(resource);
+  }
+  advanceRange(resource: string, next: string): void {
+    this.inner.advanceRange(resource, next);
+  }
+  listRanges(): IdRange[] {
+    return this.inner.listRanges();
+  }
+  rewindRange(resource: string): void {
+    this.inner.rewindRange(resource);
   }
 
   insert(resource: string, identity: string, data: unknown, origin?: Origin): StoredRecord {
@@ -98,8 +126,8 @@ class CountingStore implements Store {
     if (query) this.counts.queries.push(query);
     return this.#account(this.inner.listPaged(resource, query));
   }
-  update(resource: string, identity: string, data: unknown): StoredRecord | undefined {
-    return this.inner.update(resource, identity, data);
+  update(resource: string, identity: string, data: unknown, at?: string): StoredRecord | undefined {
+    return this.inner.update(resource, identity, data, at);
   }
   delete(resource: string, identity: string): boolean {
     return this.inner.delete(resource, identity);

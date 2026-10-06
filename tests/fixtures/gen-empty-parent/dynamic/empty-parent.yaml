@@ -1,0 +1,4 @@
+entities:
+  Venue: { count: 0 }
+  Event:
+    perParent: { entity: Venue, range: [2, 4], distribution: uniform }

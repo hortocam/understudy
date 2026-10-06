@@ -1,0 +1,323 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Open-quantifier API",
+    "version": "1.0.0",
+    "description": "F-E: identity patterns with OPEN quantifiers (+, *, {n,}). The bounded generator used to map them to exactly one unit, so ^W-[0-9]+$ allocated W-0..W-9 and then collided."
+  },
+  "paths": {
+    "/widgets": {
+      "post": {
+        "operationId": "createWidget",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WidgetInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Widget"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "bad"
+          }
+        }
+      },
+      "get": {
+        "operationId": "listWidget",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Widget"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/widgets/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getWidget",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Widget"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "nf"
+          }
+        }
+      }
+    },
+    "/gadgets": {
+      "post": {
+        "operationId": "createGadget",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GadgetInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Gadget"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "bad"
+          }
+        }
+      },
+      "get": {
+        "operationId": "listGadget",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Gadget"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gadgets/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getGadget",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Gadget"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "nf"
+          }
+        }
+      }
+    },
+    "/parts": {
+      "post": {
+        "operationId": "createPart",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Part"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "bad"
+          }
+        }
+      },
+      "get": {
+        "operationId": "listPart",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Part"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/parts/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getPart",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Part"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "nf"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Widget": {
+        "title": "Widget",
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^W-[0-9]+$"
+          },
+          "label": {
+            "type": "string"
+          }
+        }
+      },
+      "WidgetInput": {
+        "title": "WidgetInput",
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          }
+        }
+      },
+      "Gadget": {
+        "title": "Gadget",
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^G-[0-9]{3,}$"
+          },
+          "label": {
+            "type": "string"
+          }
+        }
+      },
+      "GadgetInput": {
+        "title": "GadgetInput",
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          }
+        }
+      },
+      "Part": {
+        "title": "Part",
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Z]+-[0-9]*$"
+          },
+          "label": {
+            "type": "string"
+          }
+        }
+      },
+      "PartInput": {
+        "title": "PartInput",
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

@@ -12,6 +12,7 @@
  */
 import type { Store, StoredRecord } from "../store/index.js";
 import type { Resource } from "../spec/types.js";
+import { CURSOR_NAMES, LIMIT_NAMES, OFFSET_NAMES, PAGE_NAMES } from "../spec/paging.js";
 import { present, type CrudContext } from "./crud.js";
 
 export interface ListRequest {
@@ -25,14 +26,6 @@ export interface PagingStyle {
   limit?: number;
   cursor?: string;
 }
-
-const OFFSET_NAMES = ["offset", "start", "skip"];
-const LIMIT_NAMES = ["limit", "size", "per_page", "per-page", "pagesize", "count", "maxpagesize", "page_size", "perpage"];
-const PAGE_NAMES = ["page"];
-// The target API's measured cursor spellings (docs/05-target-apis.md §1: `paginationToken`),
-// plus the common `cursor`/`page_token`/`nextPageToken`. Kept in step with the derivation's
-// `classifyParam`, which decides `kind: "paging"` from the same family.
-const CURSOR_NAMES = ["cursor", "paginationtoken", "page_token", "pagetoken", "nextpagetoken", "token"];
 
 /** A cursor token that names no record in the collection (FR-007: never a silent empty page). */
 export class ListCursorError extends Error {

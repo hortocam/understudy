@@ -119,3 +119,49 @@ describe("resource derivation", () => {
     expect(ordersEntity).toContain("params=[]");
   });
 });
+describe("duplicate derived names (FR-007: never a silent fusion)", () => {
+  async function derive() {
+    const loaded = await loadSpec(fixture("duplicate-names-api.yaml"));
+    const live = collectOperations(loaded.document);
+    return deriveModel(loaded.document, live, {});
+  }
+
+  it("derives one resource per collection, every name unique", async () => {
+    const model = await derive();
+    expect(model.resources).toHaveLength(4);
+    const names = model.resources.map((resource) => resource.name);
+    expect(new Set(names).size).toBe(4);
+    expect(model.resources.map((resource) => resource.collectionPath).sort()).toEqual([
+      "/accounts/{accountId}/invoices",
+      "/blogs/tags",
+      "/invoices",
+      "/shops/tags",
+    ]);
+  });
+
+  it("keeps each colliding resource's own identity field and paging", async () => {
+    const model = await derive();
+    const at = (path: string) => model.resources.find((resource) => resource.collectionPath === path);
+    expect(at("/invoices")?.idField).toBe("id");
+    expect(at("/accounts/{accountId}/invoices")?.idField).toBe("invoiceId");
+    expect(at("/invoices")?.pagingStyle).not.toBe(at("/accounts/{accountId}/invoices")?.pagingStyle);
+  });
+
+  it("is deterministic regardless of path order", async () => {
+    const a = (await derive()).resources.map((r) => `${r.collectionPath}=${r.name}`).sort();
+    const b = (await derive()).resources.map((r) => `${r.collectionPath}=${r.name}`).sort();
+    expect(a).toEqual(b);
+  });
+
+  it("reports every collision, naming the colliding collection paths", async () => {
+    const model = await derive();
+    const reported = model.ambiguities.filter((ambiguity) => ambiguity.kind === "duplicate-resource-name");
+    expect(reported.map((ambiguity) => ambiguity.subject).sort()).toEqual(["Invoice", "Tag"]);
+    const invoice = reported.find((ambiguity) => ambiguity.subject === "Invoice");
+    expect(invoice?.detail).toContain("/invoices");
+    expect(invoice?.detail).toContain("/accounts/{accountId}/invoices");
+    const tag = reported.find((ambiguity) => ambiguity.subject === "Tag");
+    expect(tag?.detail).toContain("/shops/tags");
+    expect(tag?.detail).toContain("/blogs/tags");
+  });
+});

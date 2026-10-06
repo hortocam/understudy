@@ -79,10 +79,10 @@ against the remote.
 **Purpose**: dependencies, the architecture guard for the new module boundary, and the two
 repoints the plan names as required.
 
-- [ ] T001 Add `@faker-js/faker` `^9` and `jsonata` `^2` to `package.json`, `npm ci`, and verify
+- [X] T001 Add `@faker-js/faker` `^9` and `jsonata` `^2` to `package.json`, `npm ci`, and verify
       `npm audit` reports no new advisories and that both import under Node 22 ESM with
       `NodeNext` resolution (a one-line smoke assertion in `tests/toolchain.test.ts`).
-- [ ] T002 [P] [FND] Extend `tests/unit/architecture.test.ts` with the new boundaries: `src/spec/`
+- [X] T002 [P] [FND] Extend `tests/unit/architecture.test.ts` with the new boundaries: `src/spec/`
       MUST NOT import `src/data/` (plan Structure Decision — derivation stays testable without a
       store); `src/cli/` MUST NOT import `src/data/`, `src/spec/`, `src/store/`, `src/mock/`;
       `src/data/` MUST NOT import `src/cli/`, `src/mock/`, `src/control/`; **no source file reads
@@ -90,18 +90,18 @@ repoints the plan names as required.
       finds nothing). **Negative control**: the checker is exercised against a synthetic
       violating source string and must flag it, so a green run cannot mean "the scanner is
       blind".
-- [ ] T003 [P] [FND] Test for the **clock seam** in `tests/unit/clock.test.ts`: the real clock
+- [X] T003 [P] [FND] Test for the **clock seam** in `tests/unit/clock.test.ts`: the real clock
       reports `mode: "real"`; with `clock.start` it returns that exact instant and **never
       advances during a run**; without it, `now()` is read once per `startRun()` and every later
       read in that run returns the same instant; `mode: "virtual"` is refused naming the mode.
       Fails first (stub returns `Date.now()` per call).
-- [ ] T004 [FND] Implement `src/clock.ts`: `interface Clock { readonly mode: "real" | "virtual";
+- [X] T004 [FND] Implement `src/clock.ts`: `interface Clock { readonly mode: "real" | "virtual";
       now(): Date }`, `createClock(config)`, a run-scoped `freeze()`; the real implementation
       only. Wire `config.clock` through `src/config/load.ts` — `clock.mode: real` and
       `clock.start` become *accepted keys* (slice 1 refuses `clock` on presence; `virtual` and
       `signing`/`postgres` still refuse, naming the key). Update `tests/unit/config.test.ts`
       expectations that asserted the old blanket `clock` refusal **in the same change**.
-- [ ] T005 [FND] **Contract repoint — config.** Test first: change the drift test in
+- [X] T005 [FND] **Contract repoint — config.** Test first: change the drift test in
       `tests/unit/config.test.ts` to read
       `specs/002-data-layer/contracts/config.schema.yaml` and assert
       `src/config/schema.generated.ts` equals it — **red** because the generated copy still
@@ -110,7 +110,7 @@ repoints the plan names as required.
       assert in the same test that slice 1's contract file is **unchanged** (`git diff --quiet
       origin/main -- specs/001-slice-1-core`). Slice 1's file is history: not deleted, not
       edited.
-- [ ] T006 [FND] **Contract repoint — control API (D4).** Create
+- [X] T006 [FND] **Contract repoint — control API (D4).** Create
       `specs/002-data-layer/contracts/control-api.openapi.json` as a byte-for-byte copy of slice
       1's plus the FR-021 `POST /generate` operation and its schemas
       (`GenerateRequest {recipe?, seed?}`, `GenerateResult {recipe, seed, clockMode, created:
@@ -131,16 +131,16 @@ contracts; the boundary guard exists and is proven able to fail.
 
 **⚠️ CRITICAL**: no later phase begins until this phase is complete.
 
-- [ ] T007 [P] [FND] Extend the error taxonomy tests in `tests/unit/errors.test.ts` (each message
+- [X] T007 [P] [FND] Extend the error taxonomy tests in `tests/unit/errors.test.ts` (each message
       contains the offending value, and **names the file and key**): `ConfigLayerInvalidError`
       (layer, file, key), `ConfigReferenceError` (unknown collection/field), `ConfigContradictsSpecError`,
       `IdentityRangeOverlapError` (collection), `InvariantViolatedError` (collection, rule,
       budget), `UnknownGeneratorError`, `RecipeNotFoundError`, `GenerationMarkerMismatchError` (D7),
       `FixtureConformanceError`. A relationship cycle is deliberately **not** an error class
       (FR-008: reported, never refused). Fails first.
-- [ ] T008 [FND] Implement the T007 errors in `src/errors.ts` and extend `renderRefusal` so each
+- [X] T008 [FND] Implement the T007 errors in `src/errors.ts` and extend `renderRefusal` so each
       renders `file: key — cause` (the same message shape for every layer, FR-005, Scenario 7).
-- [ ] T009 [P] [FND] **Extend the contract** `specs/002-data-layer/contracts/config.schema.yaml`
+- [X] T009 [P] [FND] **Extend the contract** `specs/002-data-layer/contracts/config.schema.yaml`
       with `$defs` for the four layer files, each with a documented example (constitution IX),
       *extending* the file, never forking it: `LookupFile` and `EntitiesFile` (docs/03 formats),
       `Recipe` (`seed`, `count`, `perParent {entity, range[2], distribution: uniform|zipf}`,
@@ -155,33 +155,33 @@ contracts; the boundary guard exists and is proven able to fail.
       weights-key default for `lookup` (the row's `code`, else its identity), and that **secrets
       never appear** (`${VAR:-default}` strings are validated as text, not expanded).
       Test first (T010).
-- [ ] T010 [P] [FND] Contract tests in `tests/unit/config-layers.test.ts`: **every docs/03
+- [X] T010 [P] [FND] Contract tests in `tests/unit/config-layers.test.ts`: **every docs/03
       worked example validates** (venues, inventory-statuses, ci-small recipe, webhooks,
       actions, simulations, events mapping), and each of: an unknown key, a wrong type, a
       `FieldRule` with two rule kinds, a non-enum `distribution`, a `range` of the wrong arity is
       **refused naming the key**. Fails first against the un-extended contract. Written
       *before* T009 lands (red), checked after.
-- [ ] T011 [FND] Regenerate `src/config/schema.generated.ts` from T009 and add compiled
+- [X] T011 [FND] Regenerate `src/config/schema.generated.ts` from T009 and add compiled
       per-`$def` Ajv validators in `src/config/schema.ts` (one compile each, cached) so every
       layer module validates against the **same** contract.
-- [ ] T012 [P] [US1] Test for the **fixtures layer** in `tests/unit/layers-fixtures.test.ts`:
+- [X] T012 [P] [US1] Test for the **fixtures layer** in `tests/unit/layers-fixtures.test.ts`:
       lookups and entity files parse; a missing `static/` folder (and missing `lookups/` or
       `entities/` alone) is **not an error**; a malformed row refuses naming file and key; two
       files declaring the same `(entity, id)` refuse naming both; a row without the entity's
       identity field refuses; YAML and JSON are both accepted. Fails first.
-- [ ] T013 [US1] Implement `src/config/layers/fixtures.ts`: load, validate, normalise to
+- [X] T013 [US1] Implement `src/config/layers/fixtures.ts`: load, validate, normalise to
       `FixtureSet { lookups, entities }` in a **stable order** (files by name, rows by file
       order). Pure — no store, no document.
-- [ ] T014 [P] [US2] Test for the **recipes layer** in `tests/unit/layers-recipes.test.ts`:
+- [X] T014 [P] [US2] Test for the **recipes layer** in `tests/unit/layers-recipes.test.ts`:
       `dynamic/<name>.yaml` ↔ recipe `<name>`; selecting by `recipe:` and by `--recipe`
       (CLI wins); an unknown recipe refuses naming it and listing the available names; two files
       with the same stem and different extensions refuse; a recipe's `seed` overrides the global
       seed; **JSONata expressions parse at load** (a syntax error refuses naming the
       field); `expr` dependency edges are extracted and a cycle among `expr` fields refuses
       naming both fields. Fails first.
-- [ ] T015 [US2] Implement `src/config/layers/recipes.ts` (load, select, validate, expression
+- [X] T015 [US2] Implement `src/config/layers/recipes.ts` (load, select, validate, expression
       parse + dependency extraction via the JSONata AST). Pure.
-- [ ] T016 [P] [US1] Test for the **tag selector** (D1, FR-002) in
+- [X] T016 [P] [US1] Test for the **tag selector** (D1, FR-002) in
       `tests/unit/operations-tags.test.ts` against a new fixture
       `tests/fixtures/tags-api.yaml` (**no `operationId` anywhere**, a tag `Market Orders`, a
       tag `Invoices`): a tag selects every operation carrying it; `Market_Orders` and the raw
@@ -191,20 +191,20 @@ contracts; the boundary guard exists and is proven able to fail.
       entry matching more than one form refuses as ambiguous naming the forms; an unknown entry
       is still refused by name; the report's `selection.resolved[].form` gains `tag`. Fails
       first. (Anchored to the measured fact: 0/224 operationIds on the target.)
-- [ ] T017 [US1] Implement the tag form in `src/spec/operations.ts` / `src/spec/types.ts`
+- [X] T017 [US1] Implement the tag form in `src/spec/operations.ts` / `src/spec/types.ts`
       (`SelectorForm` += `"tag"`), and update the startup-report rendering for the third form.
       Slice 1's tests stay green untouched.
-- [ ] T018 [P] [FND] Test for the **behaviour layer** in `tests/unit/layers-behavior.test.ts`
+- [X] T018 [P] [FND] Test for the **behaviour layer** in `tests/unit/layers-behavior.test.ts`
       (spec boundary: parsed and validated, **not acted on**): docs/03's four behaviour files
       validate; an unknown key in `behavior/webhooks.yaml` refuses with the **same message shape**
       as a bad `understudy.yaml` key (Scenario 7); a `when`/`template`/`where` JSONata string
       that does not parse refuses; **`${USTDY_WEBHOOK_POS_URL:-…}` is left as text** — assert no
       environment read and no socket opened (reuse `tests/helpers/outbound.ts`). Fails first.
-- [ ] T019 [FND] Implement `src/config/layers/behavior.ts` (load + validate + JSONata syntax
+- [X] T019 [FND] Implement `src/config/layers/behavior.ts` (load + validate + JSONata syntax
       check; returns an inert `BehaviorSet` that nothing in slice 2 consumes) and the
       **imports** shape validator `src/config/layers/imports.ts` (`imports/*.mapping.yaml`
       shape only; nothing reads the data files).
-- [ ] T020 [P] [FND] Test for **reconciliation against the document** (FR-005, constitution I)
+- [X] T020 [P] [FND] Test for **reconciliation against the document** (FR-005, constitution I)
       in `tests/unit/reconcile.test.ts`: `entities.<X>` naming no derived collection, a
       `relations` field that is not a property of the collection, a `relations.to` naming a
       missing collection/field, an `idField` that is not a property, a `ref:`/`lookup:` naming a
@@ -213,7 +213,7 @@ contracts; the boundary guard exists and is proven able to fail.
       the document's schema** (type, enum, format, range — FR-014), a fixture `entity` that is
       neither collection nor lookup (D10), and `ids.generatedStart` at or below an existing fixture
       identity — each refuses **naming file and key**. Fails first.
-- [ ] T021 [FND] Implement `src/config/reconcile.ts`: validate the loaded layers against the
+- [X] T021 [FND] Implement `src/config/reconcile.ts`: validate the loaded layers against the
       derived model and document, collecting **every** refusal before failing (one run, all
       causes, FR-005), and wire it plus the layer loaders into `createMock` before the store is
       opened (`src/index.ts`) and `--recipe`/`--seed` into `src/cli/program.ts` as options of
@@ -229,38 +229,38 @@ refuses with one message shape; no data has been written. `tests/unit` green.
 **Purpose**: the slice-1 deferrals data-model.md §3 names, added without changing a single
 existing `Store` method.
 
-- [ ] T022 [P] [FND] Tests for the stored model in `tests/unit/store-slice2.test.ts` against a
+- [X] T022 [P] [FND] Tests for the stored model in `tests/unit/store-slice2.test.ts` against a
       real temp SQLite file: `_id_ranges` exists with the data-model columns; it is in
       `META_TABLES` **by exact name** (the underscore-prefix lesson from slice 1's HANDOFF §5
       item 4 — a derived resource named `_id_ranges`-adjacent must not be swallowed by wipe);
       `_understudy_meta` accepts `recipe`, `seed`, `config_hash`, `clock_mode`; unwritten
       resources keep slice 1's DDL byte-for-byte (slice 1's `store.test.ts` DDL assertions stay
       green untouched). Fails first.
-- [ ] T023 [FND] Implement `_id_ranges` DDL in `src/store/schema.ts`, `Store.reserveRange /
+- [X] T023 [FND] Implement `_id_ranges` DDL in `src/store/schema.ts`, `Store.reserveRange /
       readRange / advanceRange` (additive), and the meta keys. `wipe` and `removeByOrigin` keep
       their semantics (`removeByOrigin("generated")` must also reset that collection's
       `_id_ranges.next` to its reserved start in the same transaction so wipe + regenerate is
       reproducible — test it).
-- [ ] T024 [P] [FND] Tests for **foreign keys** in `tests/unit/store-fk.test.ts`: a `decided`
+- [X] T024 [P] [FND] Tests for **foreign keys** in `tests/unit/store-fk.test.ts`: a `decided`
       relationship produces a real `REFERENCES` constraint (assert via `PRAGMA
       foreign_key_list`); `onDelete: restrict` refuses deleting a referenced parent;
       `cascade` removes children; `setNull` nulls the child field; an **`undetermined` link
       produces no constraint** (assert absence — the data-model §3 "last row"); `foreign_keys`
       pragma is on for every connection; an orphan insert is refused. Includes the integer-FK
       vs TEXT-id cast the single-`doc` table forces. Fails first.
-- [ ] T025 [FND] Implement FK constraints in `src/store/sqlite.ts`:
+- [X] T025 [FND] Implement FK constraints in `src/store/sqlite.ts`:
       `ensureResource(resource, { foreignKeys, indexes })`. **Spike inside this task**: SQLite's
       rules for foreign keys on generated columns; if a generated column cannot be a child key
       with the required actions, maintain a real `fk_<field>` column set by the store from `doc`
       on insert/update inside the same statement. Record the outcome in the task's commit message
       and PR body. Existing one-argument `ensureResource(resource)` is unchanged.
-- [ ] T026 [P] [FND] Tests for **indexes** in `tests/unit/store-index.test.ts`: each declared
+- [X] T026 [P] [FND] Tests for **indexes** in `tests/unit/store-index.test.ts`: each declared
       filterable/sortable field gets `"<resource>_<field>_idx"`; `EXPLAIN QUERY PLAN` of a
       filtered `listPaged` uses it (**not** a full scan); the *reason* (the declared list
       parameter that caused it) is available to the report. Fails first.
-- [ ] T027 [FND] Implement the indexes in `src/store/sqlite.ts` (the `json_extract` form in
+- [X] T027 [FND] Implement the indexes in `src/store/sqlite.ts` (the `json_extract` form in
       data-model §3) and thread the reason into `Resource`/`StartupReport` (T043).
-- [ ] T028 [P] [FND] Tests for `Store.insertMany` (one transaction: all rows or none — a
+- [X] T028 [P] [FND] Tests for `Store.insertMany` (one transaction: all rows or none — a
       mid-batch failure leaves **zero** rows and an unadvanced range, principle V's narrow
       form), `Store.countByOrigin()` (per resource and total), and `Store.listIdentities(resource)`
       (ordered, ids only, for reference draws). Fails first. Then implement them.
@@ -279,7 +279,7 @@ later phase consumes the model. **Golden family: inference.**
 and hide others; the report names collections, evidence, undetermined links with candidates,
 cycles, spaces and paging; pinning one in configuration changes the outcome.
 
-- [ ] T029 [P] [US4] Fixture documents (no vendor text; **shape-faithful to the measured
+- [X] T029 [P] [US4] Fixture documents (no vendor text; **shape-faithful to the measured
       facts**, `docs/05` §1): `tests/fixtures/collisions-api.yaml` (`externalId` on ≥4
       collections each meaning a different system; `eventId` + `viagogoEventId` +
       `primaryEventId` co-located on one resource; one unambiguous `venueId` → `Venue`),
@@ -288,24 +288,24 @@ cycles, spaces and paging; pinning one in configuration changes the outcome.
       `tests/fixtures/cursor-schema-api.yaml` (`paginationToken` in the response schema +
       `maxPageSize` query, plus an offset/limit and a page/size collection so all three styles
       are covered, and one collection declaring none).
-- [ ] T030 [P] [US4] **Inference golden test** in `tests/unit/inference.golden.test.ts`, written
+- [X] T030 [P] [US4] **Inference golden test** in `tests/unit/inference.golden.test.ts`, written
       before any derivation change: derive each fixture and compare the whole `{resources,
       relationships, ambiguities, plan}` serialisation to
       `tests/fixtures/golden/inference-<fixture>.json`. Goldens are authored by hand from the
       spec's rules (not captured from the code) and reviewed in the diff. Fails first on
       `status`/`candidates`/`idSpace`/`pagingStyle`.
-- [ ] T031 [US4] Extend the derived model types in `src/spec/types.ts` (data-model §1):
+- [X] T031 [US4] Extend the derived model types in `src/spec/types.ts` (data-model §1):
       `Resource.idSpace` (`integer|uuid|formatted|opaque`), `Resource.pagingStyle`
       (`cursor-in-schema|offset-limit|page-size|none-declared`), `Resource.filterFields /
       sortFields`, `Relationship.status` (`decided|undetermined`) and `candidates`, new
       `AmbiguityKind`s (`undetermined-link`, `identity-space-unreservable`,
       `paging-not-exercised`, `unpaged-large-collection`, `clock-unpinned`,
       `lookup-only`). Additive: slice 1 consumers still compile.
-- [ ] T032 [US4] Implement identity-space classification in `src/spec/resources.ts` (declared
+- [X] T032 [US4] Implement identity-space classification in `src/spec/resources.ts` (declared
       type+format+pattern → space; opaque string ⇒ `identity-space-unreservable` reported,
       **never guessed**) and paging-style classification (query parameters **and** the 2xx
       response schema's cursor property).
-- [ ] T033 [US4] Implement **convention proposes / decides only when unambiguous** (FR-006
+- [X] T033 [US4] Implement **convention proposes / decides only when unambiguous** (FR-006
       amendment B): a convention hit is *proposed*; it is `decided` iff exactly one candidate
       survives; `externalId`-class names (a name occurring on several collections with no
       distinguishing prefix, configurable list) and two sibling properties that could both be
@@ -314,30 +314,30 @@ cycles, spaces and paging; pinning one in configuration changes the outcome.
       wins over every inferred one and is reported `configured`; an `extension`
       (`x-understudy-ref`, documented in the contract) outranks convention; nesting last.
       Evidence order is asserted by a table test, one row per rung.
-- [ ] T034 [P] [US4] Test for the **generation plan** in `tests/unit/plan.test.ts`: `order` is a
+- [X] T034 [P] [US4] Test for the **generation plan** in `tests/unit/plan.test.ts`: `order` is a
       topological order over **decided** links only; ties break by collection **name** (never
       recipe order or object-key order — SC-007); a cycle yields `cycles: [[A,B,C]]`, the
       acyclic part still orders, cycle members are ordered deterministically and their cyclic
       link fields are listed as unresolved-and-reported (FR-008); `refusals` is non-empty for
       overlapping ranges / unknown collections. **Run on a 10 000-edge synthetic graph with a
       long chain — no recursion, no stack overflow (research §6).** Fails first.
-- [ ] T035 [US4] Implement `src/data/plan.ts` (`GenerationPlan` per data-model §1: `order`,
+- [X] T035 [US4] Implement `src/data/plan.ts` (`GenerationPlan` per data-model §1: `order`,
       `cycles` (Tarjan SCC, iterative), `perCollection[] {name, seed, count, idRange,
       fieldRules[]}`, `refusals`) — pure, no store.
-- [ ] T036 [P] [US4] Test the **report** in `tests/unit/report.test.ts` (extend; slice 1's
+- [X] T036 [P] [US4] Test the **report** in `tests/unit/report.test.ts` (extend; slice 1's
       assertions untouched): collections with `idSpace`, `pagingStyle` and range; every link
       with evidence; `undetermined` links listed **separately with candidates**; cycles; the
       generation order; configured counts; counts by origin; the clock mode and `clock-unpinned`
       warning; a `configured` link renders differently from a `convention` one; the **same data**
       feeds the human rendering and the structured log line. Fails first.
-- [ ] T037 [US4] Extend `src/spec/report.ts` and `src/logging.ts` for the above. `spec/` still
+- [X] T037 [US4] Extend `src/spec/report.ts` and `src/logging.ts` for the above. `spec/` still
       imports nothing from `data/`: the plan is attached to the report by `src/index.ts`.
-- [ ] T038 [P] [US4] Integration test `tests/integration/inference-startup.test.ts` — Scenario
+- [X] T038 [P] [US4] Integration test `tests/integration/inference-startup.test.ts` — Scenario
       5 and US4.1–5: start the real mock on `collisions-api.yaml`; the report lists the
       undetermined links with candidates; a `configured` pin in `understudy.yaml` flips one to
       `decided`/`configured`; a cycle document starts and **does not deadlock** (assert it
       reaches `listening` inside a timeout). Fails first.
-- [ ] T039 [US4] Wire the plan into `createMock` (`src/index.ts`): build `GenerationPlan`
+- [X] T039 [US4] Wire the plan into `createMock` (`src/index.ts`): build `GenerationPlan`
       after reconcile, **refuse on any `refusals`**, attach to `StartupReport`, log both
       renderings. T038 goes green.
 
@@ -353,10 +353,10 @@ exists yet. Inference goldens green.
 **Independent Test**: fixtures file → start twice from a wiped store → byte-identical records;
 edit the file → restart → the change is the only difference.
 
-- [ ] T040 [P] [US1] Fixture documents/files for the phase: `tests/fixtures/fixtures-project/`
+- [X] T040 [P] [US1] Fixture documents/files for the phase: `tests/fixtures/fixtures-project/`
       (`understudy.yaml`, `static/lookups/*.yaml`, `static/entities/*.yaml`) built on
       `inventory-api.yaml` + a second collection with a decided link to it.
-- [ ] T041 [P] [US1] Integration test `tests/integration/fixtures.test.ts` (US1.1–1.4):
+- [X] T041 [P] [US1] Integration test `tests/integration/fixtures.test.ts` (US1.1–1.4):
       declared identities and values exist exactly; **start twice from a wiped store → the
       serialised static rows are byte-identical**; edit one fixture value, restart → only that
       row differs; remove a fixture row from the file, restart → the stale `static` row is gone;
@@ -364,22 +364,22 @@ edit the file → restart → the change is the only difference.
       one (US1.4 — assert the response bodies carry no origin field); the origin column is
       `static` for every fixture row and **`runtime` for everything the API wrote**; the fixture
       files on disk are byte-identical before/after (hash). Fails first.
-- [ ] T042 [US1] Implement `src/data/fixtures.ts`: reconcile the store's `static` rows to the
+- [X] T042 [US1] Implement `src/data/fixtures.ts`: reconcile the store's `static` rows to the
       `FixtureSet` in **one transaction** (insert/replace changed, delete stale static rows),
       the **only** code path that writes `origin='static'`; validate each body against the
       document's schema first (FR-014); order by FK DAG so parents precede children. Wire into
       `createMock` after table creation.
-- [ ] T043 [P] [US1] Test in `tests/integration/fixture-origin.test.ts`: no code path other than
+- [X] T043 [P] [US1] Test in `tests/integration/fixture-origin.test.ts`: no code path other than
       `fixtures.ts` can write a `static` row — assert by running generation, API CRUD and `wipe`
       and diffing `static` rows byte-for-byte (SC-003, narrowed per D2: fixture **files** never rewritten, fixture rows
       applied identically on every start, and `static` rows byte-identical across generation,
       reads, lists and `wipe`), and **`wipe` leaves static rows and rewinds `id_seq`** (slice 1
       semantics, consumed unchanged). A `PATCH`/`PUT`/`DELETE` of a static-origin row **mutates it** (D2: API writes ARE mutations; slice 1's CRUD semantics stand) — assert the mutation is allowed and that no *other* slice-2 path writes `static`; the `OPEN-D2` placeholder is dropped (D2 resolved). **Also in this change (spec-first, D2):** amend `spec.md` FR-002/SC-003 to scope the immutability guarantee to the layers that own the rows (naming the API-write path explicitly), and add an **A4 amendment** recording the decision and its *Why* (constitution Governance). **NC**:
       temporarily route a generation insert with `origin='static'`; the test must fail.
-- [ ] T044 [P] [US1] Test that **selecting by tag works end to end for fixtures** (D1, FR-002):
+- [X] T044 [P] [US1] Test that **selecting by tag works end to end for fixtures** (D1, FR-002):
       a project on `tags-api.yaml` selecting `Market_Orders` loads fixtures for the collections
       those operations derive, with no `operationId` available. Fails first, passes with T017.
-- [ ] T045 [US1] Make T041, T043, T044 pass; record the byte-comparison output for the PR.
+- [X] T045 [US1] Make T041, T043, T044 pass; record the byte-comparison output for the PR.
 
 **Checkpoint**: fixtures are applied identically forever and never touched (US1, SC-003 for the
 fixture layer).
@@ -392,16 +392,16 @@ fixture layer).
 produced it**. No store here — pure functions, so determinism is cheap to prove.
 **Golden families: precedence, generators.**
 
-- [ ] T046 [P] [US3] Test for **seed derivation** in `tests/unit/seed.test.ts`: same
+- [X] T046 [P] [US3] Test for **seed derivation** in `tests/unit/seed.test.ts`: same
       `(seed, name)` ⇒ same stream across 10 constructions; different names ⇒ different first
       draws; the derivation is **not** index-ordered (insert a name, others unchanged — the
       SC-007 mechanism, asserted on the derivation alone); a vector of fixed `(seed,name) →
       first 5 draws` is checked in as a golden so a library upgrade that changes Mersenne output
       is caught. Fails first.
-- [ ] T047 [US3] Implement `src/data/seed.ts`: `hash(globalSeed, name)` (sha256 → uint32) →
+- [X] T047 [US3] Implement `src/data/seed.ts`: `hash(globalSeed, name)` (sha256 → uint32) →
       `Rng` (`next()`, `int(lo,hi)`, `pick`, `weighted`) and a Faker instance bound to that
       stream with `setDefaultRefDate(clock.now())` (research §1 trap). One stream per collection.
-- [ ] T048 [P] [US7] **Generators golden test** in `tests/unit/generators.golden.test.ts`, one
+- [X] T048 [P] [US7] **Generators golden test** in `tests/unit/generators.golden.test.ts`, one
       table per built-in with a fixed seed and the expected 20 values checked into
       `tests/fixtures/golden/generators-*.json`: `choice` (+ asserts every value ∈ set), `seq`
       (monotonic, named, independent per collection), `lookup` (uniform and weighted; **weighted
@@ -410,26 +410,26 @@ produced it**. No store here — pure functions, so determinism is cheap to prov
       `faker` (path + args, e.g. `string.alpha` length 1 upper; unknown path refuses naming it),
       `expr` (below). **NC**: swap the weighted draw for a uniform one; the weights test must
       fail. Fails first.
-- [ ] T049 [P] [US7] Test the **registry** in `tests/unit/registry.test.ts`: built-ins and
+- [X] T049 [P] [US7] Test the **registry** in `tests/unit/registry.test.ts`: built-ins and
       custom generators share **one namespace** (FR-012); a custom `choice` generator from
       `generators:` in a recipe is used exactly like a built-in; a **plugin file** generator
       (path in config, ESM default export `(ctx) => value`) is loaded with a **config-relative**
       path and is given only the collection's seeded `Rng` (so it cannot break determinism by
       construction); a name collision between custom and built-in refuses naming both; an
       unknown generator refuses naming it. Fails first.
-- [ ] T050 [US7] Implement `src/data/generators/{registry,faker,lookup,reference,sequence,choice}.ts`
+- [X] T050 [US7] Implement `src/data/generators/{registry,faker,lookup,reference,sequence,choice}.ts`
       to make T048/T049 pass.
-- [ ] T051 [P] [US2] Test for **`expr`** in `tests/unit/expr.test.ts`: `price: cost * $uniform(1.1,
+- [X] T051 [P] [US2] Test for **`expr`** in `tests/unit/expr.test.ts`: `price: cost * $uniform(1.1,
       2.5)` is evaluated **after** `cost`; the result equals `cost × the seeded draw` (recompute
       from the stream); `$uniform`/`$choice` draw from the **collection's** stream (re-running
       gives identical output; a sibling collection's draws do not shift it); a field depending
       on a field with a later declaration still orders correctly; a cycle is refused at load
       (T015); a runtime type error (JSONata signature mismatch) fails **loudly naming the
       field**. Fails first.
-- [ ] T052 [US2] Implement `src/data/generators/expr.ts`: JSONata with seeding-aware helpers
+- [X] T052 [US2] Implement `src/data/generators/expr.ts`: JSONata with seeding-aware helpers
       registered via `registerFunction` **with signatures**; evaluation order from T015's
       dependency edges.
-- [ ] T053 [P] [US7] **Precedence golden test** in `tests/unit/precedence.golden.test.ts` — the
+- [X] T053 [P] [US7] **Precedence golden test** in `tests/unit/precedence.golden.test.ts` — the
       FR-010 chain, one field walked down all six levels by removing a source at a time
       (US7 independent test): (1) explicit rule → (2) supplied value → (3) lookup reference → (4)
       the document's enum/format/range/example/default → (5) faker heuristic by name+format →
@@ -439,12 +439,12 @@ produced it**. No store here — pure functions, so determinism is cheap to prov
       falls through to the heuristic (FR-014); a field with nothing falls to level 6 and the
       provenance says `type-default`; **a heuristic-chosen value is flagged** so the report can
       say "chosen by a fallback" (US7.4). Fails first.
-- [ ] T054 [US7] Implement `src/data/precedence.ts`: `chooseValue(field, ctx) → {value,
+- [X] T054 [US7] Implement `src/data/precedence.ts`: `chooseValue(field, ctx) → {value,
       provenance}`; the **static** counterpart `planField(field)` that reports which level *will*
       supply each unruled field (feeds `GenerationPlan.fieldRules` and the report, T037) so the
       two can never disagree — they are one function with a dry-run flag, not two
       implementations (research §5 alternative rejected).
-- [ ] T055 [P] [US2] Test **schema conformance** in `tests/unit/conformance.test.ts` (FR-014,
+- [X] T055 [P] [US2] Test **schema conformance** in `tests/unit/conformance.test.ts` (FR-014,
       SC-004): property-style over a fixture schema exercising `enum`, `format`
       (`date-time`,`date`,`uuid`,`email`,`uri`), `minimum/maximum/exclusive*`,
       `minLength/maxLength`, `pattern` (the supported subset), `minItems/maxItems`, nested
@@ -452,10 +452,10 @@ produced it**. No store here — pure functions, so determinism is cheap to prov
       validates** against the Ajv validator compiled from the document. A schema construct the
       generator cannot satisfy refuses naming collection and field (never stores a
       non-conforming record, never silently loosens). Fails first.
-- [ ] T056 [US2] Implement the schema-driven level-4/5/6 generator in `src/data/precedence.ts`
+- [X] T056 [US2] Implement the schema-driven level-4/5/6 generator in `src/data/precedence.ts`
       + `src/data/generators/faker.ts` (name+format heuristics, e.g. `email`, `*Name`, `*At`,
       `price`/`amount`, `quantity`), reusing `src/spec/identity.ts` for `pattern` strings.
-- [ ] T057 [P] [US2] Test **invariants** in `tests/unit/invariants.test.ts` (FR-013, US2.5):
+- [X] T057 [P] [US2] Test **invariants** in `tests/unit/invariants.test.ts` (FR-013, US2.5):
       `constraints: ["price >= cost"]` holds on 1 000 records; a satisfiable-but-rare invariant
       is met by **redraw** (assert `redraws > 0` was used and the final record satisfies it);
       an **impossible** one fails after exactly `redraws` attempts with
@@ -463,10 +463,10 @@ produced it**. No store here — pure functions, so determinism is cheap to prov
       stored**; `redraws` is configurable and counted per record; a constraint that fails to
       parse refuses at load. **NC**: set the budget to 0 on the satisfiable case; the test must
       then fail loudly (not pass vacuously). Fails first.
-- [ ] T058 [US2] Implement `src/data/invariants.ts` (redraw the record's *drawn* fields — never
+- [X] T058 [US2] Implement `src/data/invariants.ts` (redraw the record's *drawn* fields — never
       supplied, linked or identity fields — under the **same** stream, so the redraw is
       deterministic).
-- [ ] T059 [US7] Make T046–T057 green; show red→green per task in the PR.
+- [X] T059 [US7] Make T046–T057 green; show red→green per task in the PR.
 
 **Checkpoint**: given a document, a recipe and a seed, a record's values and their provenance are
 a pure, reproducible function — before any row is written.
@@ -477,7 +477,7 @@ a pure, reproducible function — before any row is written.
 
 **Goal**: reserved ranges across integer / uuid / formatted / opaque spaces (FR-017/018).
 
-- [ ] T060 [P] [US6] **F-E regression, first** (slice 1 deferred; this slice owns it). Test in
+- [X] T060 [P] [US6] **F-E regression, first** (slice 1 deferred; this slice owns it). Test in
       `tests/unit/identity.test.ts` (extend; slice 1's cases untouched) and
       `tests/integration/string-identity.test.ts`: for `^W-[0-9]+$`, `^W-[0-9]{3,}$`,
       `^[A-Z]+-[0-9]*$` allocate **1 000 consecutive identities**: all **unique**, all match the
@@ -486,14 +486,14 @@ a pure, reproducible function — before any row is written.
       is reported as `identity-pattern-unsupported` and falls back, never non-conforming.
       **Red on a real assertion today**: `W-0…W-9` then `UNIQUE` collision at #11. Fixture
       `tests/fixtures/open-quantifier-api.yaml`.
-- [ ] T061 [US6] Fix `src/spec/identity.ts`: an **open quantifier** (`+`, `*`, `{n,}`) on a digit
+- [X] T061 [US6] Fix `src/spec/identity.ts`: an **open quantifier** (`+`, `*`, `{n,}`) on a digit
       run renders the counter **unpadded and growing** (`{n,}` zero-pads to `n` then grows); on a
       letter run it renders a bijective base-N numeral that grows; fixed quantifiers keep the
       current bounded behaviour **with the wrap replaced by a refusal** (`IdentitySpaceExhausted`,
       named, reported) instead of silently wrapping into a collision. Output is verified against
       the declared pattern before use (existing rule). Remove the "maps open quantifiers to one
       unit" comment.
-- [ ] T062 [P] [US6] Tests in `tests/unit/identity-ranges.test.ts` (FR-017/018, SC-006), one
+- [X] T062 [P] [US6] Tests in `tests/unit/identity-ranges.test.ts` (FR-017/018, SC-006), one
       block per space: **integer** (disjoint from fixtures: a fixture id ≥ the collection's
       range start refuses naming the collection; `generatedStart` per entity and global);
       **uuid** (generated v4-shaped from the collection stream; a draw equal to a fixture or
@@ -504,16 +504,16 @@ a pure, reproducible function — before any row is written.
       allocation (FR-018)**: API-created records continue from the **same** `_id_ranges` cursor
       so they can collide with neither fixture nor generated ids — create 200 via the API after
       generating 500; assert the union is duplicate-free in every space. Fails first.
-- [ ] T063 [US6] Implement `src/data/identity.ts` and wire the slice-1 allocator
+- [X] T063 [US6] Implement `src/data/identity.ts` and wire the slice-1 allocator
       (`nextIdentity`/`src/mock/crud.ts` allocation) to consult it **without changing CRUD
       semantics** — a delegation behind the existing `ids` option, covered by slice 1's
       untouched suites staying green.
-- [ ] T064 [P] [US6] Integration test `tests/integration/identity-collision.test.ts` (US6.1–6.4,
+- [X] T064 [P] [US6] Integration test `tests/integration/identity-collision.test.ts` (US6.1–6.4,
       Scenario 4): fixtures + generation in one collection ⇒ `uniq -d` over every identity is
       empty; overlapping configured ranges **refuse to start naming the collection** (assert the
       message, not a stack trace); same seed twice ⇒ same identities for the same records; a
       string-identity collection produces identities in the declared form. Fails first.
-- [ ] T065 [US6] Make T062/T064 green.
+- [X] T065 [US6] Make T062/T064 green.
 
 **Checkpoint**: no identity collides in any space, in 100% of the tested configurations (SC-006);
 F-E is closed.
@@ -525,10 +525,10 @@ F-E is closed.
 **Goal**: one data-driven pass over the plan: counts, per-parent counts, FK attachment, paging
 agreement, atomic writes. **Golden family: generators (whole-run).**
 
-- [ ] T066 [P] [US2] Fixture project `tests/fixtures/gen-project/` (`ci-small` and `load-test`
+- [X] T066 [P] [US2] Fixture project `tests/fixtures/gen-project/` (`ci-small` and `load-test`
       recipes over the multi-collection fixture document; a recipe naming an unrelated extra
       collection for SC-007; one with a deliberately impossible invariant).
-- [ ] T067 [P] [US2] Integration test `tests/integration/generate-counts.test.ts` (US2.1–2.6):
+- [X] T067 [P] [US2] Integration test `tests/integration/generate-counts.test.ts` (US2.1–2.6):
       exactly N records; **every record validates against the document schema** (re-validated
       from the store, not from the generator's own check); a `choice` field only emits set
       members; a `lookup` field references a real row (US2.3); an `expr` field is consistent with
@@ -536,7 +536,7 @@ agreement, atomic writes. **Golden family: generators (whole-run).**
       storing nothing for that collection**; a collection with **no rules at all** is populated
       from the schema alone and the report says which level supplied each field (US2.6/US7.4).
       Fails first.
-- [ ] T068 [P] [US5] Integration test `tests/integration/generate-links.test.ts` (US5.1–5.4,
+- [X] T068 [P] [US5] Integration test `tests/integration/generate-links.test.ts` (US5.1–5.4,
       SC-004): every child references an existing parent (**query the DB** for orphans — zero);
       a `perParent` range holds for every parent and is reproducible from the seed; with
       `distribution: zipf` the **count histogram is skewed** (assert a stated statistic, e.g.
@@ -545,26 +545,26 @@ agreement, atomic writes. **Golden family: generators (whole-run).**
       rows are byte-unchanged; a `decided` link with an empty parent collection and a required
       field refuses naming both; an **undetermined** link is **not acted on** (no FK, field
       generated by its own precedence, listed in the report). Fails first.
-- [ ] T069 [P] [US2] Integration test `tests/integration/generate-paging.test.ts` (FR-015,
+- [X] T069 [P] [US2] Integration test `tests/integration/generate-paging.test.ts` (FR-015,
       Amendment C): on `cursor-schema-api.yaml` with `count > maxPageSize`, listing returns a
       **page with a continuation token**, following tokens enumerates **exactly `count`**
       distinct records, and the report carries `paging-not-exercised` when `count ≤ page` and
       `unpaged-large-collection` for a collection declaring no paging; offset/limit and
       page/size collections page by their own style. **NC**: set `count` below one page; the
       page-token assertion must fail. Fails first.
-- [ ] T070 [US2] Implement `src/data/generate.ts`: run the plan in `order`; per collection derive
+- [X] T070 [US2] Implement `src/data/generate.ts`: run the plan in `order`; per collection derive
       the stream, allocate identities (T063), choose values (T054), enforce invariants (T058),
       validate against the document (FR-014), and `insertMany` in **one transaction per
       collection** together with the `_id_ranges` advance (principle V narrow form); read the
       clock **once** (D8); write the generation marker (D7); return `GenerationResult {
       created: {collection: {origin: n}}, provenance, refusals, redraws }`. One code path — **no
       per-collection or per-field branch** (SC-001 / "Prohibited"; asserted in T086).
-- [ ] T071 [US5] Implement per-parent counts and distributions in
+- [X] T071 [US5] Implement per-parent counts and distributions in
       `src/data/generate.ts` / `src/data/generators/reference.ts` (`uniform`, `zipf`; the
       per-parent count is drawn from the **child's** stream; parents enumerated in identity
       order). Implement implicit reference draws for `decided` link fields with no rule
       (provenance: level 3, `rule: relationship`).
-- [ ] T072 [US2] Wire generation into `createMock` after fixtures: recipe selected from config
+- [X] T072 [US2] Wire generation into `createMock` after fixtures: recipe selected from config
       or `--recipe`; D7 semantics (generate / skip-on-matching-marker / refuse-on-mismatch) with
       tests in `tests/integration/generate-restart.test.ts` (start, stop, start again with the
       same recipe+seed ⇒ **no regeneration, rows byte-identical**; changed seed ⇒ refusal naming
@@ -580,25 +580,25 @@ correctly linked mock (SC-001, SC-004).
 **Goal**: the generation operation lives in the control API; the CLI is a client of it.
 (`init` is the documented non-client act, with **no generation logic**, plan Constitution Check II.)
 
-- [ ] T073 [P] [US2] Control-API test in `tests/integration/control-generate.test.ts` (extends
+- [X] T073 [P] [US2] Control-API test in `tests/integration/control-generate.test.ts` (extends
       slice 1's, untouched): `POST /generate {recipe, seed?}` returns the declared
       `GenerateResult` with **counts by collection and origin** (FR-021, FR-004); the response
       validates against `contracts/control-api.openapi.json` (T006); an unknown recipe returns
       the declared 4xx `ControlError` naming it; a malformed body returns the declared 400; the
       request is **not** routed into the mocked surface; a second identical call follows D7
       (no-op, said so). Fails first.
-- [ ] T074 [US2] Implement the route in `src/control/routes.ts` over `src/data/generate.ts`
+- [X] T074 [US2] Implement the route in `src/control/routes.ts` over `src/data/generate.ts`
       (the control plane gains a `generate` dependency through `ControlContext`, nothing
       else). T073 green.
-- [ ] T075 [P] [US2] CLI tests in `tests/integration/cli.test.ts` (extend): `ustdy generate
+- [X] T075 [P] [US2] CLI tests in `tests/integration/cli.test.ts` (extend): `ustdy generate
       --recipe <n> [--seed <n>]` output agrees with the control response; with the control plane
       down it exits non-zero with a connection error and **does no local work** (FR-019/020 of
       slice 1, still binding); `up --recipe/--seed` start-time generation; the architecture
       test (T002) still passes (the CLI imports nothing from `data/`). Fails first.
-- [ ] T076 [US2] Implement `generate` in `src/cli/client.ts` + `src/cli/program.ts` and the
+- [X] T076 [US2] Implement `generate` in `src/cli/client.ts` + `src/cli/program.ts` and the
       extended `specs/002-data-layer/contracts/cli.md` (every new flag documented with a runnable
       example — constitution IX).
-- [ ] T077 [P] [US4] Test for **`ustdy init`** (FR-020, Scenario 1) in
+- [X] T077 [P] [US4] Test for **`ustdy init`** (FR-020, Scenario 1) in
       `tests/integration/init.test.ts`: against `inventory-api.yaml` the four layer folders
       (`static/{lookups,entities}`, `imports`, `dynamic`, `behavior`) and an `understudy.yaml`
       exist; **stdout is the inferred collection report** (collections, links with evidence,
@@ -606,7 +606,7 @@ correctly linked mock (SC-001, SC-004).
       (naming them) unless `--force`; the scaffolded project **starts** (`ustdy up` on it
       succeeds); the CLI module imports only `src/index.ts`/`src/init.ts`; no network beyond a
       URL the user supplied. Fails first.
-- [ ] T078 [US4] Implement `src/init.ts` (library) and the `init` command: derive via the
+- [X] T078 [US4] Implement `src/init.ts` (library) and the `init` command: derive via the
       existing pipeline, write commented scaffolds whose example content is the **documented
       examples** from the contract, print the report. Contains no generation logic.
 
@@ -619,7 +619,7 @@ API lacks (constitution II).
 
 **Goal**: the guarantees the slice sells, each shown to **fail when broken**.
 
-- [ ] T079 [P] [US3] **Determinism** — `tests/integration/determinism.test.ts` (SC-002, US3.1–3.3):
+- [X] T079 [P] [US3] **Determinism** — `tests/integration/determinism.test.ts` (SC-002, US3.1–3.3):
       from a wiped store, same seed + config + fixtures + pinned `clock.start`: generate twice,
       serialise both stores with the canonical serialiser `tests/helpers/serialize.ts` (rows
       sorted by `(collection, identity)`, keys sorted, `created_at`/`updated_at` included) and
@@ -628,26 +628,26 @@ API lacks (constitution II).
       run once, each must fail the test): replace the per-collection RNG with one shared stream;
       read `Date.now()` per record instead of once; iterate parents in `Map` insertion order of a
       shuffled input.
-- [ ] T080 [P] [US3] **Independence** — `tests/integration/independence.test.ts` (SC-007, US3.4,
+- [X] T080 [P] [US3] **Independence** — `tests/integration/independence.test.ts` (SC-007, US3.4,
       Scenario 3): add an unrelated collection to the recipe, same seed ⇒ every pre-existing
       collection's serialised rows are **byte-identical**; the same holds when the new
       collection is named to sort *before* every existing one and when it is inserted first in the
       recipe file. **NC**: the shared-stream mutation from T079 must make this fail while
       T079's double-run still passes — the "green determinism, red independence" trap research §1
       names.
-- [ ] T081 [P] [US1] **Fixture immutability** — `tests/integration/immutability.test.ts` (SC-003):
+- [X] T081 [P] [US1] **Fixture immutability** — `tests/integration/immutability.test.ts` (SC-003):
       byte-compare the serialised `static` rows (and the fixture files) before and after
       generation **and** a scripted API session (create ×N, read, list, filter, page, PATCH/DELETE
       of non-static rows, `reset wipe`); identical in 100% of 20 seeded runs. **NC**: the T043
       mutation.
-- [ ] T082 [P] [US2] **Scale** — `tests/integration/scale.test.ts` (SC-008): a recipe of ≥5 000
+- [X] T082 [P] [US2] **Scale** — `tests/integration/scale.test.ts` (SC-008): a recipe of ≥5 000
       records over ≥5 collections is generated and `GET /health` answers within a stated budget
       (assert **< 30 s** hard, print the measured time; the spec's "well under a minute" is the
       claim, 30 s the bar); memory stays flat while generating (heap high-water mark does not
       scale with count between 1 000 and 10 000 — compare, with a stated ratio bound). **NC**:
       `insertMany` replaced by per-row autocommit; the time bound must fail on the same input
       (proves the bound can fail).
-- [ ] T083 [P] [FND] **Seal slice 1's T043 blind spot** — `tests/integration/store-boundary.test.ts`
+- [X] T083 [P] [FND] **Seal slice 1's T043 blind spot** — `tests/integration/store-boundary.test.ts`
       with `tests/helpers/sql-probe.ts`: a **driver-level probe** wraps
       `better-sqlite3`'s `Database#prepare` and records, per statement, its SQL text, bound
       parameters, and **rows returned by `all()`/`iterate()`**. Over a collection of 20 000
@@ -659,7 +659,7 @@ API lacks (constitution II).
       `listPaged` as `SELECT * … ; slice()` passes the **old** decorator suite and **fails** this
       probe — the test file asserts both. Fails first against the double, passes against
       `SqliteStore`.
-- [ ] T084 [US3] Make T079–T083 green; run each `NC` once, paste the failing assertion into the
+- [X] T084 [US3] Make T079–T083 green; run each `NC` once, paste the failing assertion into the
       PR, and revert the mutation. No mutation is committed.
 
 **Checkpoint**: determinism, independence, immutability, scale and the store boundary are each
@@ -669,11 +669,11 @@ proven **and** proven falsifiable.
 
 ## Phase 11: Polish & Cross-Cutting
 
-- [ ] T085 [P] No-secrets and no-outbound sweep: `tests/integration/outbound.test.ts` (extend) runs
+- [X] T085 [P] No-secrets and no-outbound sweep: `tests/integration/outbound.test.ts` (extend) runs
       the full slice-2 lifecycle — fixtures, generation, `init`, `generate` — against a **file**
       spec and asserts **zero outbound connections** and **zero `process.env` reads in `src/`**
       (T002 grep). `${VAR}` strings in behaviour files stay inert text.
-- [ ] T086 [P] No-per-endpoint-handler guard (SC-001, constitution "Prohibited"): test that
+- [X] T086 [P] No-per-endpoint-handler guard (SC-001, constitution "Prohibited"): test that
       `src/data/` and `src/mock/` contain **no branch on a collection or field name** — a
       structural test that runs generation over two *different* fixture documents with identical
       engine code and asserts the engine has no document-specific identifiers (scan `src/data/`
@@ -691,17 +691,17 @@ proven **and** proven falsifiable.
       `vitest run` excludes `tests/live/`. The outcome is recorded in the PR body and a
       **new** `specs/002-data-layer/live-derivation.md` (the approved `research.md` is not
       edited).
-- [ ] T088 **Run `quickstart.md` end to end** against a built `dist/` and record the output as
+- [X] T088 **Run `quickstart.md` end to end** against a built `dist/` and record the output as
       `specs/002-data-layer/quickstart-run.txt` (slice 1's precedent), scenarios 1–9, **with any
       step that did not behave as written called out and fixed — in the quickstart (and say
       so) or in the code (and say so)**. D6's divergences are named there, not hidden.
-- [ ] T089 [P] Documentation (constitution IX): `README.md` reflects the shipped CLI surface
+- [X] T089 [P] Documentation (constitution IX): `README.md` reflects the shipped CLI surface
       (`init`, `generate`, `up --recipe/--seed`) and **every new config key** — `recipe`, `seed`,
       `paths.*`, `entities.<X>.{idField,writes,ids.*,relations.*.onDelete}`, `clock.*`, recipe
       keys (`count`, `perParent`, `fields`, `constraints`, `redraws`, `generators`), the
       behaviour layer — each with a **runnable example**; add a test that fails when a key in
       the contract has no mention in `README.md` or the contract's own `examples`.
-- [ ] T090 Gate and evidence: `npm ci && npm run lint && npm run typecheck && npm test && npm run
+- [X] T090 Gate and evidence: `npm ci && npm run lint && npm run typecheck && npm test && npm run
       build && node dist/cli/index.js --help`, with real output pasted; confirm `git diff
       origin/main -- specs/001-slice-1-core` is **empty** and `specs/002-data-layer/{spec,plan,
       research,data-model}.md` are unchanged; tick every task `[X]` in a final commit.
@@ -762,3 +762,176 @@ blind spot** → T083; **contract repoint** → T005 (+T006 for the control cont
 simulations (slice 5), hardening, virtual clock, Postgres (slice 6), conformance/examples
 (slice 7). The behaviour and imports layers are **parsed and validated** here and consumed
 nowhere.
+
+---
+
+## Implementation notes (appended during the run; no task above is modified except its checkbox)
+
+- **T001 — dependency pin.** `@faker-js/faker` is pinned `^10.6.0`, not the `^9` named in
+  `plan.md`: every 9.x and 10.x ≤ 10.4 carries a *high* advisory (GHSA-qxc2-j82w-r537,
+  `helpers.fake` arbitrary-code execution) and T001 requires no new advisories. 10.6 keeps the seeded
+  `Faker({ locale, randomizer })`, `setDefaultRefDate` and `generateMersenne53Randomizer` API the
+  research §1 design uses (verified by the T001 smoke test). Recorded in the PR.
+- **T002 — `process.env`.** The one `process.env` read is `src/cli/index.ts`, the CLI's process
+  boundary, which hands the environment to the (env-free) program; the guard asserts the *library*
+  never reads it.
+- **T007/T008 — red evidence.** The taxonomy classes are declarations; their test failed on the
+  missing exports (not on an assertion) before the classes landed. The behavioural refusals they
+  carry are asserted by T012–T021, each shown failing on a real assertion first.
+- **T009 — contract additions beyond the task text.** The extended contract also adds the
+  `inference` key (`idSuffixes`, `ambiguousNames`), because FR-006 rung 3 says "(configurable
+  rules)" and constitution IX requires every key to ship documented with an example. Defaults are in
+  the contract and applied in `src/config/load.ts`.
+- **T020/T021 — reconcile semantics decided here.** All recipes are reconciled (not only the
+  selected one) so a typo cannot hide in the dataset switched to next; a `relations.to` must
+  target the collection's identity field (a link resolves to a record's identity); `lookup:` names a
+  fixture table; `choice` values are checked against the property's own schema.
+- **T025 — spike outcome (FK mechanism).** SQLite *accepts* a generated column as a foreign-key
+  child key for `RESTRICT`/`CASCADE`, but raises `cannot UPDATE generated column` when the parent
+  delete is *prepared* under `ON DELETE SET NULL`. So the store keeps a **real** `fk_<field>` TEXT
+  column maintained from the record body on every insert/update (`CAST(json_extract(?, '$.f') AS
+  TEXT)`), and `setNull` adds an `AFTER UPDATE OF fk_<field>` trigger so the **record body** (not
+  only the hidden column) reads `null`. One mechanism for all three policies. Changing a pinned
+  relation after data exists rebuilds the table in place and refuses naming the resource if rows
+  would orphan (`StoreSchemaConflictError`).
+- **T027 — index use.** SQLite uses an expression index only when the query repeats the
+  expression, so a *declared* filterable/sortable property inlines its (quote-escaped) path as a
+  literal; every other property keeps slice 1's bound-path form, so a hostile property name still
+  cannot reach the SQL text.
+- **T023 — `removeByOrigin`/`wipe` and restrict.** Both now run in one transaction with
+  `defer_foreign_keys`, so a restrict link passes when parent and children go together.
+- **T022 — slice 1's `CountingStore` (large-collection test)** gained pure-delegation methods for
+  the additive seam so the typecheck stays green; its assertions are untouched.
+- **T032/T033 — derivation rules fixed here.** A property proposes a link when its word-tokens
+  (camel/snake split) end with an entity's tokens plus an id suffix, or equal the entity name
+  (`viagogoEventId` proposes Event); the longest entity match wins, a tie is *undetermined*; an
+  integer property cannot reference a string identity. Two or more sibling properties proposing
+  the same target are all *undetermined* with each other as `candidates`. `ambiguousNames`
+  (default `externalId, referenceId, refId, parentId`) are never decided. A configured pin or a
+  declared `x-understudy-relationships` extension resolves a tie: the competing undetermined
+  siblings to the same target (or on the same field) disappear. `sortFields` come from a sort
+  parameter's declared `enum` (a generic `sort` string declares none); indexes exist for filter
+  parameters and those enum fields that are declared properties.
+- **T035 — FKs only for `one` links.** An array-valued link (`cardinality: many`) still orders
+  generation but cannot be a foreign-key column, so it gets none.
+- **T039 — API writes and the new constraints (new surface consequence, flagged).** Real foreign
+  keys mean `POST`/`PATCH` naming a missing parent and `DELETE` of a still-referenced parent
+  now fail at the store. The mock renders them as the document's *declared* client error
+  (400 / 409, else the first declared 4xx, never a bare 500) via a store-level
+  `ReferenceViolationError`. This is slice 1 CRUD semantics made consistent with `restrict`, not
+  new endpoints; it is called out in the PR.
+- **FR-015 and the response envelope (finding for the owner).** Slice 1's list serves bare arrays
+  and honours the client-supplied cursor (the identity of the last record seen) — the target's
+  paging is query-parameter driven (`docs/05` §1: "not a uniform response envelope"). Slice 2
+  keeps that surface: a generated collection larger than the page lists as pages reached by the
+  cursor, and the report states the style. It does **not** add a wrapper response carrying
+  `nextPageToken` for the five wrapper schemas — that would be new mocked-surface behaviour.
+- **T042 — fixture sync rules.** Unchanged rows are left byte-for-byte alone (so a restart on the
+  same store keeps their timestamps); a changed row is updated with the run's clock instant and its
+  original `created_at`; a static row the files no longer declare is removed; a fixture whose
+  identity is already held by a non-static record refuses (`IdentityRangeOverlapError`). A link
+  from a fixture row to a parent that no fixture declares and the store does not hold refuses before
+  anything is written, naming file, entity, identity and `rows[i].field`. `Store.update` gained an
+  optional explicit `updated_at` so the clock seam (not the wall clock) stamps static rows.
+- **T043 — D2 delivered.** `spec.md` FR-002/SC-003 amended and A4 recorded (spec-first, in this
+  change); the `OPEN-D2` placeholder dropped; the structural test asserts exactly one source file
+  writes `origin: "static"`.
+- **T053/T054 — FR-010 read as written (flag for the owner).** `data-model.md` §2's "level it
+  satisfies" column puts an explicit `faker:` rule at level 5 and a `lookup:` rule at level 3, which
+  would let a spec `enum` (4) or a supplied value (2) override a rule the developer wrote — the
+  opposite of FR-010 (1) and US7.1. The spec governs: **any explicit recipe rule is level 1**, and
+  `provenance.rule` records its kind (`faker:string.alpha`, `lookup:InventoryStatus`, `expr`, …).
+  Level 3 is the implicit reference an unruled field takes when a DECIDED link points at a parent.
+  Level 4 inner order: const, enum, examples, default. The precedence golden is hand-authored.
+- **T048 — generator value vectors.** A fixed seed's output cannot be hand-authored; the
+  `generators-*.json` goldens are *regression vectors* captured once with `UPDATE_GOLDEN=1`,
+  reviewed for plausibility (membership, weights, bounds) and checked in. The structural guarantees
+  (membership, the 0.8/0.1/0.1 shape, monotonic sequences) are asserted directly alongside.
+- **T056 — pattern generation.** faker's `fromRegExp` does not strip `^`/`$` or understand `\d`,
+  so a declared pattern is normalised (anchors stripped, `\d`/`\w` spelled out) before it is
+  handed over and the result is verified against the original pattern; a construct outside what it
+  can satisfy (a lookahead) refuses naming the field. An RFC 3339 `time` needs a zone (`…Z`).
+- **T052 — expressions.** `$now()`/`$millis()` are overridden to the clock seam's instant; an
+  expression that yields nothing (a missing sibling) is an error, never a silently dropped field.
+- **T060/T061 — F-E closed.** Red evidence: against the slice-1 allocator the integration test
+  fails at `create #11: expected 500 to be 201` (the `UNIQUE` collision at W-0…W-9 + 1), and the
+  1 000-identity unit cases fail on duplicates. Fix: pattern runs carry `{min, max}`; an open run
+  grows with the counter and keeps its minimum width; the counter is carried by the digit runs, or by
+  the letter runs (base 26) when there is no digit run; a fixed run that is out of room throws
+  `IdentitySpaceExhaustedError` instead of wrapping modulo its width. `patternSupported` now probes
+  with small counters (a `{3}` run is supported) and requires distinct values.
+- **T063 — runtime allocation (D3).** `id_seq:<resource>` stays the API counter (rewound by
+  `wipe`); the API path now skips any identity the table already holds, whatever its origin, so
+  it cannot reissue a fixture or generated identity. A `format: uuid` identity gets a deterministic
+  v4-shaped uuid of the counter (slice 1 would have issued a base-36 string that violates the
+  declared format). `_id_ranges` holds the reserved span, space and generation cursor; a scoped
+  `reset` rewinds it too (`Store.rewindRange`).
+- **T064 — generation half.** The generation-dependent assertions of US6.1/6.3 (no generated
+  identity equals a fixture identity; same seed ⇒ same identities) are asserted in
+  `tests/integration/generate-*.test.ts` and `determinism.test.ts` (Phases 8 and 10), which is
+  where generation exists.
+- **T070 — atomic as a whole.** Records of every collection are built in memory (a `RunPool`
+  serves references from this run's rows plus the store) and written in ONE transaction with every
+  identity-range advance and the generation marker, so a run that fails stores nothing (the
+  `impossible` recipe test starts a clean project afterwards). `store.transaction` cannot span an
+  `await`, which is why drawing (async: JSONata) and writing (sync) are separate steps.
+- **T071 — cycles and empty parents.** A decided link to a collection generated later in a reported
+  cycle, or to one with no records, is *omitted* when optional (noted in the report) and refused
+  when the schema requires it, naming both collections — never an invented parent.
+- **T072 — `up` generates; the same code path serves `POST /generate`.** `createMock` exposes
+  `generate()` (serialised so two runs never interleave); D7's marker is `gen_recipe`, `gen_seed`
+  and `gen_config` (a digest of the document hash, `entities`/`ids`/`inference`, fixtures, `clock.start`
+  and the recipe body). A recipe's own `seed:` wins over the configuration's; `--seed` wins over both.
+- **FR-015 paging agreement.** The report adds `paging-not-exercised` (a declared page cap that the
+  collection fits inside) and `unpaged-large-collection` (> 100 records, no declared paging).
+- **T079–T084 — negative controls (each run once, each failed on a real assertion, none committed).**
+  Recorded verbatim in the PR. Shared stream → independence red while the double-run determinism
+  tests stay green (the research §1 trap, demonstrated); wall clock per record, shuffled parent order
+  → determinism red; generation writing `origin: 'static'` → immutability red; `SqliteStore` no longer
+  binding LIMIT → the driver probe red on the real store.
+- **T082 — what was changed and why (my own task text, corrected).** The task asked that heap
+  "stay flat". Generation builds a whole run in memory so it can be written atomically (a failed run
+  stores nothing — T070, principle V), so memory is O(records) by design; the test asserts a small
+  per-record constant (measured ≈ 0.7–2.4 KB/record) instead of flatness, and says so. The
+  per-row-autocommit mutation did **not** breach the 30 s bar on this container's filesystem (commit
+  cost is negligible here), so that mutation does not prove the bound can fail; an injected 6 ms/record
+  cost does (46.6 s > 30 s). Measured: 6 711 records over 5 collections generated, started and serving
+  `/health` in ≈ 2.2 s.
+- **T083 — shipped as designed.** `tests/helpers/sql-probe.ts` wraps `Database#prepare` and records
+  SQL, params and rows crossing into JS; offset/limit, page/size and cursor are each asserted over
+  20 000 rows; `MaterialisingStore` (reads everything through the driver, slices in JS) returns a
+  correct page at the `Store` interface and is rejected by the probe (`20000 rows`, `no bound LIMIT`).
+- **T087 — NOT COMPLETE (left unticked on purpose).** The harness (`tests/live/`, `test:live`,
+  `vitest.live.config.ts`, default `npm test` excludes it) is delivered and was run against local
+  stand-in documents, but **the vendor document could not be fetched**: the build environment's
+  egress policy answered 403 to the CONNECT for `pointofsaleapi.stubhub.net:443` (an organisation
+  policy denial; not retried, not worked around). No vendor measurement exists, and none is
+  invented — see `specs/002-data-layer/live-derivation.md` for the status and the one command that
+  completes it. The outcome file is a **new** document (the approved `research.md` is not edited).
+
+### Review round 1 (coordinator review of PR 2; changes requested, T087 left to the coordinator)
+
+- **BLOCKER — duplicate resource names.** The live run found 118 collections but 77 unique names;
+  everything keyed by name (store table, identity space, plan) fused them. `deriveModel` now
+  renames **every** colliding collection to a deterministic path-qualified name (`/shops/tags` →
+  `ShopsTag`; none keeps the bare name, so nothing quietly "wins"; a numeric suffix breaks any
+  residual tie) and reports a `duplicate-resource-name` ambiguity naming the colliding paths. The
+  CI repro is `tests/fixtures/duplicate-names-api.yaml` (two `Invoice` titles with different
+  idField/paging, two untitled `…/tags`); `tests/live` line 80 is unchanged and its CI mirror is in
+  `plan.test.ts`. Configuration refers to the **final** name (an unknown name is refused, loudly).
+- **MAJOR — raw config shape.** Defaults now fill ABSENT sections only; a present-but-wrong-shaped
+  `seed`/`paths`/`inference`/`entities`/`server`/`control`/`storage`/`ids` refuses, naming the key.
+- **MAJOR — `entities.<X>.idField`.** Wired into derivation (identity type/pattern/space re-read
+  from the pinned property, identity ambiguities re-reported) and into live CRUD. `Resource.instanceParam`
+  records the path parameter that addresses an instance, so routing no longer assumes it equals the
+  identity field (this also fixes a nested instance path binding the first parameter).
+- **Minors.** `entities.<X>.writes: actions-only` → `ReservedConfigError`. An uncompilable schema →
+  `conformance-unchecked` ambiguity (SC-004 limit is visible). A pattern too narrow to reach the
+  generated start → structured refusal, not a throw. `perParent` over an empty parent → a note.
+  `BehaviorFile` examples fixed (`on:` not `"true":`); `docs-keys.test.ts` now validates every
+  contract example and a README behaviour example, and covers `BehaviorFile`/`ImportMapping` keys.
+  Config contract drift test is byte-equal. A pinned `onDelete: cascade` that removes the child's
+  fixture rows is **accepted as a consequence of real FK behaviour (A4) and reported** at startup
+  (`cascade-removes-fixtures`).
+- **Not done here (by design):** T087 — the coordinator re-runs `test:live` against the real
+  document and commits `live-derivation-run.md`.

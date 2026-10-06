@@ -1,0 +1,1015 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Shop API",
+    "version": "1.0.0",
+    "description": "Multi-collection fixture for slice 2: Venue <- Event <- Inventory (convention links), InventoryStatus (a lookup), AuditNote (ambiguous generic reference names). Paging is limit/offset."
+  },
+  "paths": {
+    "/venues": {
+      "get": {
+        "operationId": "listVenue",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Venue"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createVenue",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VenueInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Venue"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "bad"
+          }
+        }
+      }
+    },
+    "/venues/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getVenue",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Venue"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "nf"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateVenue",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VenueInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Venue"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "nf"
+          },
+          "400": {
+            "description": "bad reference"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteVenue",
+        "responses": {
+          "204": {
+            "description": "gone"
+          },
+          "404": {
+            "description": "nf"
+          },
+          "409": {
+            "description": "conflict: still referenced"
+          }
+        }
+      }
+    },
+    "/events": {
+      "get": {
+        "operationId": "listEvent",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "venueId",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Event"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createEvent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Event"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "bad"
+          }
+        }
+      }
+    },
+    "/events/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getEvent",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Event"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "nf"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateEvent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Event"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "nf"
+          },
+          "400": {
+            "description": "bad reference"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteEvent",
+        "responses": {
+          "204": {
+            "description": "gone"
+          },
+          "404": {
+            "description": "nf"
+          },
+          "409": {
+            "description": "conflict: still referenced"
+          }
+        }
+      }
+    },
+    "/inventory": {
+      "get": {
+        "operationId": "listInventory",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "eventId",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Inventory"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createInventory",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Inventory"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "bad"
+          }
+        }
+      }
+    },
+    "/inventory/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getInventory",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Inventory"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "nf"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateInventory",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Inventory"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "nf"
+          },
+          "400": {
+            "description": "bad reference"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteInventory",
+        "responses": {
+          "204": {
+            "description": "gone"
+          },
+          "404": {
+            "description": "nf"
+          },
+          "409": {
+            "description": "conflict: still referenced"
+          }
+        }
+      }
+    },
+    "/inventory-statuses": {
+      "get": {
+        "operationId": "listInventoryStatus",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InventoryStatus"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createInventoryStatus",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryStatusInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "bad"
+          }
+        }
+      }
+    },
+    "/inventory-statuses/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getInventoryStatus",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryStatus"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "nf"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateInventoryStatus",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryStatusInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryStatus"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "nf"
+          },
+          "400": {
+            "description": "bad reference"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteInventoryStatus",
+        "responses": {
+          "204": {
+            "description": "gone"
+          },
+          "404": {
+            "description": "nf"
+          },
+          "409": {
+            "description": "conflict: still referenced"
+          }
+        }
+      }
+    },
+    "/audit-notes": {
+      "get": {
+        "operationId": "listAuditNote",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuditNote"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createAuditNote",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuditNoteInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditNote"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "bad"
+          }
+        }
+      }
+    },
+    "/audit-notes/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getAuditNote",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditNote"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "nf"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateAuditNote",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuditNoteInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditNote"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "nf"
+          },
+          "400": {
+            "description": "bad reference"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteAuditNote",
+        "responses": {
+          "204": {
+            "description": "gone"
+          },
+          "404": {
+            "description": "nf"
+          },
+          "409": {
+            "description": "conflict: still referenced"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Venue": {
+        "title": "Venue",
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 40
+          },
+          "city": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "MA",
+              "NY",
+              "CA"
+            ]
+          },
+          "timezone": {
+            "type": "string"
+          }
+        }
+      },
+      "Event": {
+        "title": "Event",
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "venueId"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 3
+          },
+          "venueId": {
+            "type": "integer"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "music",
+              "sport",
+              "theatre"
+            ]
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "contactEmail": {
+            "type": "string",
+            "format": "email"
+          }
+        }
+      },
+      "Inventory": {
+        "title": "Inventory",
+        "type": "object",
+        "required": [
+          "id",
+          "eventId",
+          "quantity"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "eventId": {
+            "type": "integer"
+          },
+          "statusId": {
+            "type": "integer"
+          },
+          "section": {
+            "type": "string"
+          },
+          "row": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "cost": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "price": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 2000
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      },
+      "InventoryStatus": {
+        "title": "InventoryStatus",
+        "type": "object",
+        "required": [
+          "id",
+          "code"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "code": {
+            "type": "string"
+          }
+        }
+      },
+      "AuditNote": {
+        "title": "AuditNote",
+        "type": "object",
+        "required": [
+          "id",
+          "text"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "text": {
+            "type": "string"
+          },
+          "externalId": {
+            "type": "string"
+          },
+          "referenceId": {
+            "type": "string"
+          }
+        }
+      },
+      "VenueInput": {
+        "title": "VenueInput",
+        "type": "object",
+        "required": [],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 40
+          },
+          "city": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "MA",
+              "NY",
+              "CA"
+            ]
+          },
+          "timezone": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "EventInput": {
+        "title": "EventInput",
+        "type": "object",
+        "required": [],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 3
+          },
+          "venueId": {
+            "type": "integer"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "music",
+              "sport",
+              "theatre"
+            ]
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "contactEmail": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        "additionalProperties": true
+      },
+      "InventoryInput": {
+        "title": "InventoryInput",
+        "type": "object",
+        "required": [],
+        "properties": {
+          "eventId": {
+            "type": "integer"
+          },
+          "statusId": {
+            "type": "integer"
+          },
+          "section": {
+            "type": "string"
+          },
+          "row": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "cost": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "price": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 2000
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "InventoryStatusInput": {
+        "title": "InventoryStatusInput",
+        "type": "object",
+        "required": [],
+        "properties": {
+          "code": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "AuditNoteInput": {
+        "title": "AuditNoteInput",
+        "type": "object",
+        "required": [],
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "externalId": {
+            "type": "string"
+          },
+          "referenceId": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  }
+}

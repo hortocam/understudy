@@ -7,9 +7,31 @@
  * names the offending input, never the framework's own envelope.
  */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import {
+  ConfigRefusedError,
+  GenerationMarkerMismatchError,
+  GenerationRefusedError,
+  IdentityRangeOverlapError,
+  IdentitySpaceExhaustedError,
+  InvariantViolatedError,
+  RecipeNotFoundError,
+  UnknownGeneratorError,
+} from "../errors.js";
 import type { OperationRef, Resource } from "../spec/types.js";
-import { ORIGINS, type RequestLogEntry, type Store } from "../store/index.js";
+import { ORIGINS, ReferenceViolationError, type Origin, type RequestLogEntry, type Store } from "../store/index.js";
 import { CONTROL_API_CONTENT_TYPE } from "./openapi.js";
+
+/** What a generation run reports; structurally satisfied by `data/generate.ts`'s summary. */
+export interface GenerateAnswer {
+  recipe: string;
+  seed: number;
+  regenerated: boolean;
+  created: Record<string, Partial<Record<Origin, number>>>;
+  counts: Record<string, Partial<Record<Origin, number>>>;
+  provenance: Record<string, Record<string, Record<string, number>>>;
+  redraws: number;
+  instant?: string;
+}
 
 export interface ControlContext {
   /** The reserved prefix, e.g. `/__understudy`; no trailing slash. */
@@ -21,6 +43,12 @@ export interface ControlContext {
   resources: Resource[];
   /** `config.ids.generatedStart`: where a rewound counter starts again. */
   idsStart: number;
+  /** Per-collection API-identity start (an entity's own `generatedStart`, or a formatted range's start). */
+  idStarts?: Record<string, number>;
+  /** Apply a recipe to the running mock (FR-021). The same code path `up --recipe` uses. */
+  generate: (options: { recipe?: string; seed?: number }) => Promise<GenerateAnswer>;
+  /** The clock in force, reported with each generation (FR-019). */
+  clock: { mode: string; pinned: boolean };
   /** The inlined contract text, served verbatim. */
   openapiBytes: string;
   /** Shut the running mock down. Idempotent. */
@@ -127,19 +155,26 @@ function wipe(ctx: ControlContext, scope: Resource[]): Record<string, number> {
     removed[resource.name] = identities.length;
   }
 
-  if (scope.length === ctx.resources.length) {
-    // Everything is in scope, so the store-wide removal is exactly the wipe.
-    for (const origin of ORIGINS) {
-      if (origin !== "static") ctx.store.removeByOrigin(origin);
+  // One transaction: a reset is all-or-nothing, and foreign-key checks wait for the commit so a
+  // parent and its children can be reset together.
+  ctx.store.transaction(() => {
+    if (scope.length === ctx.resources.length) {
+      // Everything is in scope, so the store-wide removal is exactly the wipe.
+      for (const origin of ORIGINS) {
+        if (origin !== "static") ctx.store.removeByOrigin(origin);
+      }
+    } else {
+      // `removeByOrigin` is store-wide; a scoped reset deletes only the named resources' records.
+      for (const [name, identities] of doomed) {
+        for (const identity of identities) ctx.store.delete(name, identity);
+      }
     }
-  } else {
-    // `removeByOrigin` is store-wide; a scoped reset deletes only the named resources' records.
-    for (const [name, identities] of doomed) {
-      for (const identity of identities) ctx.store.delete(name, identity);
-    }
-  }
 
-  for (const resource of scope) ctx.store.setMeta(`id_seq:${resource.name}`, String(ctx.idsStart));
+    for (const resource of scope) {
+      ctx.store.setMeta(`id_seq:${resource.name}`, String(ctx.idStarts?.[resource.name] ?? ctx.idsStart));
+      ctx.store.rewindRange(resource.name); // wipe + regenerate must allocate the same identities
+    }
+  });
   return removed;
 }
 
@@ -191,7 +226,75 @@ export function buildControlRoutes(instance: FastifyInstance, ctx: ControlContex
       scope = picked;
     }
 
-    return { ok: true, mode: "wipe", removed: wipe(ctx, scope) };
+    try {
+      return { ok: true, mode: "wipe", removed: wipe(ctx, scope) };
+    } catch (error) {
+      // A scoped reset of a parent while records of another collection still reference it is
+      // refused by the store's foreign key (restrict): say which, rather than answer a bare 500.
+      if (error instanceof ReferenceViolationError) {
+        return malformed(
+          reply,
+          `cannot reset ${scope.map((r) => r.name).join(", ")} on its own: other records still reference ${scope.length === 1 ? "it" : "them"} (onDelete: restrict); include the referencing collections in the reset, or reset them all`,
+          "entities",
+        );
+      }
+      throw error;
+    }
+  });
+
+  instance.post(`${prefix}/generate`, async (request, reply) => {
+    const parsed = readJsonBody(request.body);
+    if (!parsed.ok) return malformed(reply, "the request body is not valid JSON", "body");
+    if (parsed.value !== undefined && !isObject(parsed.value)) return malformed(reply, "the request body must be a JSON object", "body");
+    const body = parsed.value ?? {};
+    for (const key of Object.keys(body)) {
+      if (key !== "recipe" && key !== "seed") return malformed(reply, `unknown field "${key}"; the body takes only "recipe" and "seed"`, key);
+    }
+    if (body.recipe !== undefined && (typeof body.recipe !== "string" || body.recipe.length === 0)) {
+      return malformed(reply, "recipe must be a non-empty string", "recipe");
+    }
+    if (body.seed !== undefined && (typeof body.seed !== "number" || !Number.isInteger(body.seed))) {
+      return malformed(reply, "seed must be an integer", "seed");
+    }
+    try {
+      const answer = await ctx.generate({
+        ...(body.recipe !== undefined ? { recipe: body.recipe as string } : {}),
+        ...(body.seed !== undefined ? { seed: body.seed as number } : {}),
+      });
+      return {
+        ok: true,
+        recipe: answer.recipe,
+        seed: answer.seed,
+        regenerated: answer.regenerated,
+        clock: { mode: ctx.clock.mode, pinned: ctx.clock.pinned, ...(answer.instant ? { instant: answer.instant } : {}) },
+        created: answer.created,
+        counts: answer.counts,
+        provenance: answer.provenance,
+        redraws: answer.redraws,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (error instanceof RecipeNotFoundError) {
+        const refused: ControlError = { error: "unknown_recipe", message, field: "recipe" };
+        return reply.code(404).send(refused);
+      }
+      if (error instanceof GenerationMarkerMismatchError) {
+        const refused: ControlError = { error: "generation_conflict", message };
+        return reply.code(409).send(refused);
+      }
+      if (
+        error instanceof ConfigRefusedError ||
+        error instanceof InvariantViolatedError ||
+        error instanceof GenerationRefusedError ||
+        error instanceof IdentitySpaceExhaustedError ||
+        error instanceof IdentityRangeOverlapError ||
+        error instanceof UnknownGeneratorError
+      ) {
+        const refused: ControlError = { error: "generation_refused", message };
+        return reply.code(422).send(refused);
+      }
+      throw error;
+    }
   });
 
   instance.get(`${prefix}/requests`, async (request, reply) => {

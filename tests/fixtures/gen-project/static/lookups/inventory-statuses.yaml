@@ -1,0 +1,7 @@
+entity: InventoryStatus
+idField: id
+rows:
+  - { id: 1, code: available }
+  - { id: 2, code: held }
+  - { id: 3, code: sold }
+  - { id: 4, code: cancelled }

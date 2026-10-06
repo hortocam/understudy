@@ -1,0 +1,47 @@
+{
+  "resources": [
+    {
+      "name": "CursorThing",
+      "idField": "id",
+      "idType": "integer",
+      "idSpace": "integer",
+      "pagingStyle": "cursor-in-schema",
+      "filterFields": [],
+      "sortFields": []
+    },
+    {
+      "name": "OffsetThing",
+      "idField": "id",
+      "idType": "integer",
+      "idSpace": "integer",
+      "pagingStyle": "offset-limit",
+      "filterFields": [],
+      "sortFields": []
+    },
+    {
+      "name": "PageThing",
+      "idField": "id",
+      "idType": "integer",
+      "idSpace": "integer",
+      "pagingStyle": "page-size",
+      "filterFields": [],
+      "sortFields": []
+    },
+    {
+      "name": "PlainThing",
+      "idField": "id",
+      "idType": "integer",
+      "idSpace": "integer",
+      "pagingStyle": "none-declared",
+      "filterFields": [],
+      "sortFields": []
+    }
+  ],
+  "relationships": [],
+  "ambiguities": [
+    {
+      "kind": "no-list-parameters",
+      "path": "/plain-things"
+    }
+  ]
+}

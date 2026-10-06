@@ -1,0 +1,47 @@
+[
+  {
+    "step": "an explicit rule beats every other source",
+    "level": 1,
+    "rule": "choice"
+  },
+  {
+    "step": "no rule: a supplied value wins over a reference, the spec and any heuristic",
+    "level": 2,
+    "rule": "supplied"
+  },
+  {
+    "step": "no supplied value: a decided link draws an existing parent",
+    "level": 3,
+    "rule": "reference:Status"
+  },
+  {
+    "step": "no link: the spec's enum",
+    "level": 4,
+    "rule": "enum"
+  },
+  {
+    "step": "enum removed: a declared example",
+    "level": 4,
+    "rule": "example"
+  },
+  {
+    "step": "example removed: the declared default",
+    "level": 4,
+    "rule": "default"
+  },
+  {
+    "step": "default removed: a plausible value from the declared format",
+    "level": 5,
+    "rule": "heuristic:format=email"
+  },
+  {
+    "step": "no format: a plausible value from the field name",
+    "level": 5,
+    "rule": "heuristic:name=phone"
+  },
+  {
+    "step": "nothing to go on: the type's default",
+    "level": 6,
+    "rule": "type-default"
+  }
+]

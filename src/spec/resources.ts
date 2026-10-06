@@ -19,6 +19,8 @@ import type {
   Resource,
 } from "./types.js";
 import { patternSupported } from "./identity.js";
+import { LIMIT_NAMES, PAGING_PARAM_NAMES, classifyPaging } from "./paging.js";
+import type { IdSpaceKind } from "./types.js";
 
 const EVIDENCE_RANK: Record<RelationshipEvidence, number> = {
   configured: 4,
@@ -27,9 +29,26 @@ const EVIDENCE_RANK: Record<RelationshipEvidence, number> = {
   nesting: 1,
 };
 
+/** The naming-convention rules of link inference (config key `inference`, FR-006 rung 3). */
+export interface InferenceRules {
+  /** Suffixes that propose a link: `Id` makes `eventId` propose Event. */
+  idSuffixes: string[];
+  /** Property names that denote a different entity per collection; never decided by convention. */
+  ambiguousNames: string[];
+}
+
+export const DEFAULT_INFERENCE: InferenceRules = {
+  idSuffixes: ["Id", "_id"],
+  ambiguousNames: ["externalId", "referenceId", "refId", "parentId"],
+};
+
 export interface DeriveOptions {
+  /** Naming-convention rules; the documented defaults when absent. */
+  inference?: InferenceRules;
   /** Relationships supplied explicitly; the `configured` evidence seam (slice 2 wires config to it). */
   configuredRelationships?: RelationshipHint[];
+  /** `entities.<X>.idField` pins, keyed by the FINAL (disambiguated) collection name. */
+  idFields?: Record<string, string>;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -124,33 +143,7 @@ function requestSchema(operation: Record<string, unknown>): unknown {
 
 function classifyParam(name: string): ListParamKind {
   const n = name.toLowerCase();
-  if (
-    [
-      "limit",
-      "offset",
-      "page",
-      "size",
-      "pagesize",
-      "maxpagesize",
-      "page_size",
-      "per_page",
-      "per-page",
-      "perpage",
-      "cursor",
-      "start",
-      "count",
-      // Cursor-token spellings measured on the target API (docs/05-target-apis.md §1:
-      // `paginationToken` ×21). A token misread as a filter makes a conforming client's
-      // page request answer `[]` (FR-007).
-      "paginationtoken",
-      "nextpagetoken",
-      "pagetoken",
-      "page_token",
-      "token",
-    ].includes(n)
-  ) {
-    return "paging";
-  }
+  if (PAGING_PARAM_NAMES.has(n) || n === "pagesize" || n === "per_page") return "paging";
   if (n === "sort" || n.startsWith("sort") || n.includes("order")) return "sort";
   return "filter";
 }
@@ -181,12 +174,24 @@ function listParamsOf(
 ): ListParam[] {
   const merged = queryParamsOf(pathParameters);
   for (const [name, parameter] of queryParamsOf(operation?.parameters)) merged.set(name, parameter);
-  return [...merged.values()].map((parameter) => ({
-    name: parameter.name as string,
-    in: "query",
-    kind: classifyParam(parameter.name as string),
-    required: parameter.required === true,
-  }));
+  return [...merged.values()].map((parameter) => {
+    const param: ListParam = {
+      name: parameter.name as string,
+      in: "query",
+      kind: classifyParam(parameter.name as string),
+      required: parameter.required === true,
+    };
+    const schema = isObject(parameter.schema) ? parameter.schema : undefined;
+    const enumValues = schema && Array.isArray(schema.enum) ? schema.enum : undefined;
+    const itemEnum = schema && isObject(schema.items) && Array.isArray(schema.items.enum) ? schema.items.enum : undefined;
+    const values = (enumValues ?? itemEnum)?.filter((v): v is string => typeof v === "string");
+    if (values && values.length > 0) param.values = values;
+    if (param.kind === "paging" && schema) {
+      const cap = typeof schema.maximum === "number" ? schema.maximum : typeof schema.default === "number" ? schema.default : undefined;
+      if (cap !== undefined && LIMIT_NAMES.includes(param.name.toLowerCase())) param.pageCap = cap;
+    }
+    return param;
+  });
 }
 
 function operationRef(operation: DocumentOperation): OperationRef {
@@ -262,11 +267,124 @@ export function deriveModel(
       pathItemParameters.get(collectionPath),
     );
     resources.push(resource);
-    if (instance) instancePathToResource.set(instance.instancePath, resource.name);
+  }
+
+  disambiguateNames(resources, ambiguities);
+  applyIdFieldPins(resources, ambiguities, options.idFields ?? {});
+  for (const resource of resources) {
+    if (resource.instancePath) instancePathToResource.set(resource.instancePath, resource.name);
   }
 
   const relationships = inferRelationships(document, resources, instancePathToResource, options, ambiguities);
   return { resources, relationships, ambiguities };
+}
+
+/** A path-qualified name: every literal segment, PascalCased, the last one singular (`/shops/tags` → `ShopsTag`). */
+function qualifiedName(collectionPath: string): string {
+  const literal = segments(collectionPath).filter((segment) => !isParamSegment(segment));
+  return literal
+    .map((segment, index) => capitalise(index === literal.length - 1 ? singularise(segment) : segment))
+    .join("")
+    .replace(/[^A-Za-z0-9_]/g, "");
+}
+
+/**
+ * Two distinct collections must never share a name: the store, identity spaces, plan and config
+ * are all keyed by it, so a shared name would fuse them silently. Every colliding resource is
+ * renamed to a path-qualified, deterministic name (none keeps the bare name, so nothing quietly
+ * "wins"), and the collision is reported with the colliding paths (FR-007).
+ */
+function disambiguateNames(resources: Resource[], ambiguities: Ambiguity[]): void {
+  const byName = new Map<string, Resource[]>();
+  for (const resource of resources) {
+    const list = byName.get(resource.name) ?? [];
+    list.push(resource);
+    byName.set(resource.name, list);
+  }
+  const taken = new Set<string>(
+    [...byName.entries()].filter(([, group]) => group.length === 1).map(([name]) => name),
+  );
+  for (const name of [...byName.keys()].sort()) {
+    const group = (byName.get(name) ?? []).slice().sort((a, b) => a.collectionPath.localeCompare(b.collectionPath));
+    if (group.length < 2) continue;
+    const renamed: string[] = [];
+    for (const resource of group) {
+      const base = qualifiedName(resource.collectionPath) || name;
+      let candidate = base;
+      for (let n = 2; taken.has(candidate) || candidate === name; n += 1) candidate = `${base}${n}`;
+      taken.add(candidate);
+      for (const ambiguity of ambiguities) {
+        if (ambiguity.path !== (resource.instancePath ?? resource.collectionPath) && ambiguity.path !== resource.collectionPath) continue;
+        if (ambiguity.kind === "duplicate-resource-name") continue;
+        if (ambiguity.subject === name) ambiguity.subject = candidate;
+        ambiguity.detail = ambiguity.detail.split(name).join(candidate);
+      }
+      resource.name = candidate;
+      renamed.push(`${resource.collectionPath} → ${candidate}`);
+    }
+    ambiguities.push({
+      kind: "duplicate-resource-name",
+      path: group[0]?.collectionPath ?? "",
+      subject: name,
+      detail: `${group.length} distinct collections would all be named ${name} (${group.map((r) => r.collectionPath).join(", ")}); each was given a path-qualified name (${renamed.join("; ")}) — pin a schema title or rename them in the document to choose`,
+    });
+  }
+}
+
+const IDENTITY_AMBIGUITIES: ReadonlySet<string> = new Set([
+  "identity-field-unknown",
+  "identity-space-unreservable",
+  "identity-pattern-unsupported",
+]);
+
+/**
+ * `entities.<X>.idField` makes a different property the collection's identity (the fixture layer
+ * already honours it). The identity facts — type, pattern, space — are re-read from that property
+ * and the identity ambiguities are re-reported against it, so live CRUD, generation and the report
+ * all agree with the fixtures.
+ */
+function applyIdFieldPins(resources: Resource[], ambiguities: Ambiguity[], pins: Record<string, string>): void {
+  for (const resource of resources) {
+    const pin = pins[resource.name];
+    if (pin === undefined || pin === resource.idField) continue;
+    const key = resource.instancePath ?? resource.collectionPath;
+    for (let i = ambiguities.length - 1; i >= 0; i -= 1) {
+      const a = ambiguities[i] as Ambiguity;
+      if (a.path === key && IDENTITY_AMBIGUITIES.has(a.kind)) ambiguities.splice(i, 1);
+    }
+    const element = elementSchema(resource.representationSchema);
+    const properties = element && isObject(element.properties) ? element.properties : undefined;
+    const property = properties && isObject(properties[pin]) ? properties[pin] : undefined;
+    resource.idField = pin;
+    resource.idType = property?.type === "string" ? "string" : "integer";
+    resource.idSpace = idSpaceOf(property, resource.idType);
+    delete resource.idPattern;
+    if (typeof property?.pattern === "string") resource.idPattern = property.pattern;
+    if (resource.idSpace === "opaque") {
+      ambiguities.push({
+        kind: "identity-space-unreservable",
+        path: key,
+        subject: resource.name,
+        detail: `${resource.name}'s identity is a string with no declared uuid format or pattern, so no range can be reserved within it; identities fall back to opaque short ids and are kept distinct from fixtures by a membership check`,
+      });
+    }
+    if (resource.idPattern !== undefined && resource.idType === "string" && !patternSupported(resource.idPattern)) {
+      ambiguities.push({
+        kind: "identity-pattern-unsupported",
+        path: key,
+        ...(resource.operations.read?.operationId !== undefined ? { operationId: resource.operations.read.operationId } : {}),
+        detail: `${resource.name} declares identity pattern ${resource.idPattern}, which the mock's generator cannot satisfy; identities fall back to an opaque short id`,
+      });
+    }
+  }
+}
+
+/** The identity space an identity property lives in (FR-017): declared type + format + pattern. */
+function idSpaceOf(idProperty: Record<string, unknown> | undefined, idType: "integer" | "string"): IdSpaceKind {
+  if (idType === "integer") return "integer";
+  if (idProperty?.format === "uuid") return "uuid";
+  if (typeof idProperty?.pattern === "string") return "formatted";
+  return "opaque";
 }
 
 function deriveResource(
@@ -343,16 +461,41 @@ function deriveResource(
     ...(deleteOp ? { delete: operationRef(deleteOp) } : {}),
   };
 
+  const idSpace = idSpaceOf(idProperty, idType);
+  if (idSpace === "opaque") {
+    ambiguities.push({
+      kind: "identity-space-unreservable",
+      path: instance?.instancePath ?? collectionPath,
+      subject: name,
+      detail: `${name}'s identity is a string with no declared uuid format or pattern, so no range can be reserved within it; identities fall back to opaque short ids and are kept distinct from fixtures by a membership check`,
+    });
+  }
+  const sortFields = [
+    ...new Set(
+      listParams
+        .filter((param) => param.kind === "sort")
+        .flatMap((param) => param.values ?? [])
+        .map((value) => value.replace(/^[+-]/, "")),
+    ),
+  ];
+
   const resource: Resource = {
     name,
     collectionPath,
     idField,
     idType,
+    idSpace,
+    pagingStyle: classifyPaging(listParams, Object.keys(properties ?? {})),
+    filterFields: listParams.filter((param) => param.kind === "filter").map((param) => param.name),
+    sortFields,
     listParams,
     operations,
     nameSource: title ? "schema-title" : "path-segment",
   };
-  if (instance) resource.instancePath = instance.instancePath;
+  if (instance) {
+    resource.instancePath = instance.instancePath;
+    resource.instanceParam = instance.param;
+  }
   if (representationSchema !== undefined) resource.representationSchema = representationSchema;
   if (createOp) {
     const createSchema = requestSchema(createOp.operation);
@@ -397,6 +540,63 @@ function cardinalityOf(resource: Resource, field: string): "one" | "many" {
   return property?.type === "array" ? "many" : "one";
 }
 
+/** Lower-case word tokens of a camelCase / snake_case name: `viagogoEventId` -> viagogo, event, id. */
+function tokens(name: string): string[] {
+  return name
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    .split(/[\s_]+/)
+    .filter((t) => t.length > 0)
+    .map((t) => t.toLowerCase());
+}
+
+function endsWith(haystack: string[], needle: string[]): boolean {
+  if (needle.length === 0 || needle.length > haystack.length) return false;
+  return needle.every((token, i) => haystack[haystack.length - needle.length + i] === token);
+}
+
+/** The scalar type a link property declares (an array's element type), if any. */
+function linkType(schema: Record<string, unknown>): string | undefined {
+  if (schema.type === "array" && isObject(schema.items)) return typeof schema.items.type === "string" ? schema.items.type : undefined;
+  return typeof schema.type === "string" ? schema.type : undefined;
+}
+
+interface Proposal {
+  target: Resource;
+  /** The entity's own name tokens matched as the whole name (`eventId`) rather than after a prefix. */
+  exact: boolean;
+}
+
+/**
+ * Which collections a property name PROPOSES (FR-006 rung 3): the name's tokens end with an
+ * entity's tokens followed by an id suffix (`viagogoEventId` proposes Event), or are exactly the
+ * entity name. The longest entity match wins (`orderLineId` proposes OrderLine, not Line); a tie
+ * is returned whole so the caller can see it was not decisive.
+ */
+function propose(field: string, owner: Resource, resources: Resource[], property: Record<string, unknown>, rules: InferenceRules): Proposal[] {
+  const fieldTokens = tokens(field);
+  const suffixes = rules.idSuffixes.map((suffix) => tokens(suffix));
+  const found: Array<Proposal & { weight: number }> = [];
+  for (const candidate of resources) {
+    if (candidate.name === owner.name) continue;
+    const entity = tokens(candidate.name);
+    const bare = fieldTokens.length === entity.length && endsWith(fieldTokens, entity);
+    let matched = bare;
+    let exact = bare;
+    for (const suffix of suffixes) {
+      if (!endsWith(fieldTokens, [...entity, ...suffix])) continue;
+      matched = true;
+      if (fieldTokens.length === entity.length + suffix.length) exact = true;
+    }
+    if (!matched) continue;
+    const type = linkType(property);
+    if (type !== undefined && type !== candidate.idType) continue; // an integer link cannot reference a string identity
+    found.push({ target: candidate, exact, weight: entity.length });
+  }
+  const longest = Math.max(0, ...found.map((f) => f.weight));
+  return found.filter((f) => f.weight === longest).map(({ target, exact }) => ({ target, exact }));
+}
+
 function inferRelationships(
   document: Record<string, unknown>,
   resources: Resource[],
@@ -404,51 +604,105 @@ function inferRelationships(
   options: DeriveOptions,
   ambiguities: Ambiguity[],
 ): Relationship[] {
+  const rules = options.inference ?? DEFAULT_INFERENCE;
   const collected: Relationship[] = [];
   const names = new Set(resources.map((resource) => resource.name));
+  const ambiguousNames = new Set(rules.ambiguousNames.map((n) => n.toLowerCase()));
+  const decided = (r: Omit<Relationship, "status">): Relationship => ({ ...r, status: "decided" });
 
   // (1) configured
   for (const hint of options.configuredRelationships ?? []) {
     if (!names.has(hint.from) || !names.has(hint.to)) continue;
-    collected.push({ from: hint.from, to: hint.to, field: hint.field, cardinality: "one", evidence: "configured" });
+    collected.push(decided({ from: hint.from, to: hint.to, field: hint.field, cardinality: "one", evidence: "configured" }));
   }
 
   // (2) spec extension
   for (const hint of asHints(document["x-understudy-relationships"])) {
     if (!names.has(hint.from) || !names.has(hint.to)) continue;
-    collected.push({ from: hint.from, to: hint.to, field: hint.field, cardinality: "one", evidence: "extension" });
+    collected.push(decided({ from: hint.from, to: hint.to, field: hint.field, cardinality: "one", evidence: "extension" }));
   }
 
-  // (3) naming convention
+  // (3) naming convention — a hit PROPOSES; it decides only when nothing competes with it.
+  const undetermined: Relationship[] = [];
+  const undeterminedLink = (owner: Resource, field: string, to: string, candidates: string[], detail: string): void => {
+    undetermined.push({
+      from: owner.name,
+      to,
+      field,
+      cardinality: cardinalityOf(owner, field),
+      evidence: "convention",
+      status: "undetermined",
+      candidates,
+    });
+    ambiguities.push({ kind: "undetermined-link", subject: `${owner.name}.${field}`, detail });
+  };
   for (const resource of resources) {
     const element = elementSchema(resource.representationSchema);
     const properties = element && isObject(element.properties) ? element.properties : undefined;
     if (!properties) continue;
+    const bySiblingTarget = new Map<string, Array<{ field: string; target: Resource }>>();
     for (const field of Object.keys(properties)) {
-      const lower = field.toLowerCase();
-      const matches = resources.filter((candidate) => {
-        if (candidate.name === resource.name) return false;
-        const base = lowerFirst(candidate.name).toLowerCase();
-        return lower === `${base}id` || lower === `${base}_id` || lower === base;
-      });
-      if (matches.length > 1) {
-        ambiguities.push({
-          kind: "ambiguous-relationship",
-          detail: `property "${field}" on ${resource.name} matches more than one entity: ${matches
-            .map((match) => match.name)
-            .join(", ")}`,
-        });
+      if (field === resource.idField) continue;
+      const property = isObject(properties[field]) ? properties[field] : {};
+      if (ambiguousNames.has(field.toLowerCase())) {
+        undeterminedLink(
+          resource,
+          field,
+          "",
+          [],
+          `${resource.name}.${field} is a known-ambiguous name: it denotes a different external entity per collection, so the convention does not decide it; pin it with entities.${resource.name}.relations.${field} if it is a link`,
+        );
         continue;
       }
-      const target = matches[0];
-      if (target) {
-        collected.push({
-          from: resource.name,
-          to: target.name,
-          field,
-          cardinality: cardinalityOf(resource, field),
-          evidence: "convention",
+      const proposals = propose(field, resource, resources, property, rules);
+      if (proposals.length > 1) {
+        const targets = proposals.map((p) => p.target.name).sort();
+        ambiguities.push({
+          kind: "ambiguous-relationship",
+          subject: `${resource.name}.${field}`,
+          detail: `property "${field}" on ${resource.name} matches more than one entity: ${targets.join(", ")}`,
         });
+        undeterminedLink(
+          resource,
+          field,
+          "",
+          targets,
+          `${resource.name}.${field} could reference any of ${targets.join(", ")}; pin it with entities.${resource.name}.relations.${field}`,
+        );
+        continue;
+      }
+      const only = proposals[0];
+      if (only) {
+        const list = bySiblingTarget.get(only.target.name) ?? [];
+        list.push({ field, target: only.target });
+        bySiblingTarget.set(only.target.name, list);
+      }
+    }
+    for (const [targetName, fields] of bySiblingTarget) {
+      const target = fields[0]?.target as Resource;
+      if (fields.length === 1) {
+        const only = fields[0] as { field: string };
+        collected.push(
+          decided({
+            from: resource.name,
+            to: targetName,
+            field: only.field,
+            cardinality: cardinalityOf(resource, only.field),
+            evidence: "convention",
+          }),
+        );
+        continue;
+      }
+      // Two or more sibling properties could each be the link: record the tie, decide nothing.
+      const candidates = fields.map((f) => f.field).sort();
+      for (const { field } of fields) {
+        undeterminedLink(
+          resource,
+          field,
+          target.name,
+          candidates,
+          `${resource.name} has several properties that could each be the link to ${target.name} (${candidates.join(", ")}); the convention does not choose between them — pin one with entities.${resource.name}.relations`,
+        );
       }
     }
   }
@@ -458,14 +712,28 @@ function inferRelationships(
     const parent = parentPath(resource.collectionPath);
     const parentName = instancePathToResource.get(parent);
     if (parentName && parentName !== resource.name) {
-      collected.push({
-        from: resource.name,
-        to: parentName,
-        field: `${lowerFirst(parentName)}Id`,
-        cardinality: "one",
-        evidence: "nesting",
-      });
+      collected.push(
+        decided({
+          from: resource.name,
+          to: parentName,
+          field: `${lowerFirst(parentName)}Id`,
+          cardinality: "one",
+          evidence: "nesting",
+        }),
+      );
     }
+  }
+
+  // A pin (configured) or a declared extension RESOLVES a tie: the competing undetermined
+  // siblings that point at the same target, and an undetermined link on the same field, go away.
+  const resolvers = collected.filter((r) => r.evidence === "configured" || r.evidence === "extension");
+  const survivors = undetermined.filter(
+    (u) => !resolvers.some((r) => r.from === u.from && (r.field === u.field || (u.to !== "" && r.to === u.to))),
+  );
+  const resolvedSubjects = new Set(undetermined.filter((u) => !survivors.includes(u)).map((u) => `${u.from}.${u.field}`));
+  for (let i = ambiguities.length - 1; i >= 0; i -= 1) {
+    const a = ambiguities[i] as Ambiguity;
+    if (a.kind === "undetermined-link" && a.subject !== undefined && resolvedSubjects.has(a.subject)) ambiguities.splice(i, 1);
   }
 
   // Deduplicate by (from, to, field), keeping the strongest evidence.
@@ -477,5 +745,5 @@ function inferRelationships(
       byKey.set(key, relationship);
     }
   }
-  return [...byKey.values()];
+  return [...byKey.values(), ...survivors];
 }
