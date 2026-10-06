@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { InvariantViolatedError } from "../../src/errors.js";
 import type { RunningMock } from "../../src/index.js";
 import { conformanceErrors } from "../../src/spec/conform.js";
+import { renderRefusal } from "../../src/logging.js";
 import { startGen } from "../helpers/project.js";
 
 const mocks: RunningMock[] = [];
@@ -83,12 +84,14 @@ describe("US2 — exact counts, every record conforming, every rule honoured", (
   });
 
   it("2.5 an impossible invariant fails the run loudly, naming the rule, and stores NOTHING from the run", async () => {
-    const out: string[] = [];
-    const error = await startGen("impossible", { out }).catch((e) => e as Error);
+    const error = await startGen("impossible").catch((e) => e as Error);
     expect(error).toBeInstanceOf(InvariantViolatedError);
     expect((error as Error).message).toContain("Inventory");
     expect((error as Error).message).toContain("price > 1000000");
-    expect(out.join("\n")).toContain("refusing to start");
+    // FU: the human rendering is produced at the process boundary (the CLI), not written by
+    // `createMock` to its `out` sink — that dual write was the source of the three-times print.
+    // The loudness FR-013 demands is the named, rendered refusal, checked here via `renderRefusal`.
+    expect(renderRefusal(error)).toContain("refusing to start");
     // a later start on the same project must not find a half-generated store
     const m = await gen("ci-small");
     expect(m.store.countByOrigin().Venue?.generated).toBe(3);
