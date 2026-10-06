@@ -267,13 +267,15 @@ export class StoreSchemaConflictError extends UnderstudyError {
 
 
 /**
- * A derived resource's name is exactly one of the tool's own table names (`_understudy_meta`,
- * `_requests`, `_id_ranges`). The resource's table would collide with a table the tool manages,
- * so the mock refuses to start — naming the colliding collection and the reserved table — rather
- * than failing later inside the driver with an opaque constraint error (constitution VI).
+ * A derived resource's name is one of the tool's own table names (`_understudy_meta`,
+ * `_requests`, `_id_ranges`), or a case-variant of one. The resource's table would collide with
+ * a table the tool manages, so the mock refuses to start — naming the colliding collection and
+ * the reserved table — rather than failing later inside the driver with an opaque constraint
+ * error (constitution VI).
  *
- * Reserved by *exact name*, never by a `_` prefix: a document may legitimately name a collection
- * `_events` (`_event`), which is not reserved.
+ * Matching folds ASCII case because SQLite table identity does: `_Requests` and `_requests` are
+ * the same physical table. It is never a `_` prefix test, so a document may legitimately name a
+ * collection `_events` (`_event`), which does not fold onto any reserved table.
  */
 export class ReservedTableNameError extends UnderstudyError {
   readonly resource: string;

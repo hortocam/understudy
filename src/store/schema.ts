@@ -21,6 +21,37 @@ export const SCHEMA_VERSION = "1";
 export const ID_RANGES_TABLE = "_id_ranges";
 export const META_TABLES: ReadonlySet<string> = new Set([META_TABLE, REQUESTS_TABLE, ID_RANGES_TABLE]);
 
+/**
+ * ASCII-only lowercasing — the case fold SQLite applies to identifiers.
+ *
+ * SQLite compares table names with a binary equality that ignores ASCII case (`"_Requests"`
+ * and `_requests` name the same physical table) and leaves every other character untouched.
+ * JavaScript's Unicode `toLowerCase` would fold some non-ASCII code points that SQLite does
+ * not, so the fold here is deliberately restricted to `[A-Z]`.
+ */
+function asciiFold(value: string): string {
+  return value.replace(/[A-Z]/g, (ch) => ch.toLowerCase());
+}
+
+/**
+ * The tool table a resource name would collide with under SQLite's identifier identity, if any.
+ *
+ * A derived resource's name becomes its table name, and SQLite table identity is
+ * case-insensitive for ASCII. An exact-name test (`META_TABLES.has`) therefore misses a title
+ * like `_Requests`: `CREATE TABLE IF NOT EXISTS "_Requests"` silently no-ops onto the tool's
+ * already-existing `_requests` table, and the index DDL then dies on a missing column. Matching
+ * by folded name closes the case-variant of that collision. Returns the canonical reserved table
+ * name the resource folds onto, or `undefined` when the name is free. Still never a `_`-prefix
+ * test: `_event` does not fold onto any reserved table and stays allowed.
+ */
+export function reservedTableFor(resource: string): string | undefined {
+  const folded = asciiFold(resource);
+  for (const table of META_TABLES) {
+    if (asciiFold(table) === folded) return table;
+  }
+  return undefined;
+}
+
 /** Quote an SQL identifier, escaping embedded quotes. */
 export function quoteIdent(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;

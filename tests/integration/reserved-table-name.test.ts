@@ -20,6 +20,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { ReservedTableNameError, UnderstudyError } from "../../src/errors.js";
 import type { RunningMock } from "../../src/index.js";
+import { renderRefusal } from "../../src/logging.js";
 import { createSqliteStore } from "../../src/store/sqlite.js";
 import { fixturePath, start } from "../helpers/mock.js";
 
@@ -56,9 +57,14 @@ describe("a resource named exactly a tool table is refused, naming the reserved 
     // ...and it does NOT surface as the old opaque SQL failure.
     expect(message).not.toContain("no such column");
 
-    // The human-facing startup output carries the same refusal, so `ustdy up` reads plainly.
-    expect(out).toContain("refusing to start");
-    expect(out).toContain("_requests");
+    // The human rendering is produced at the process boundary, not by the library: #25 moved
+    // it to `renderRefusal` (src/logging.ts) and the CLI prints it once from the thrown error
+    // (refusals.test.ts). Assert both halves so this cannot regress to the old contract:
+    // the library's `out` sink stays empty, and the boundary rendering names the refusal.
+    const rendered = renderRefusal(error);
+    expect(rendered).toContain("refusing to start");
+    expect(rendered).toContain("_requests");
+    expect(out).toBe("");
   });
 
   it("the reservation covers every tool table, not just _requests", async () => {

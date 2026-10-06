@@ -1,0 +1,68 @@
+openapi: 3.1.0
+info:
+  title: Reserved Table Case API
+  version: 1.0.0
+  description: >
+    Fixture for the case-variant tool-table-name collision (FU: a resource named `_Requests`,
+    `_Understudy_Meta` or `_Id_Ranges`). SQLite table identity is case-insensitive, so a schema
+    `title` that case-folds to one of the tool's own tables collides with it even though the
+    string is not an exact match. The representation schema's `title` is `_Requests`, a
+    case-variant of the tool's `_requests` table. `/notes` is a positive control: a normal
+    resource that must keep starting.
+paths:
+  /widgets:
+    get:
+      operationId: listWidgets
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ReservedWidget" }
+  /notes:
+    get:
+      operationId: listNotes
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Note" }
+    post:
+      operationId: createNote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NoteCreate" }
+      responses:
+        "201":
+          description: created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Note" }
+components:
+  schemas:
+    ReservedWidget:
+      title: _Requests
+      type: object
+      required: [id, kind]
+      properties:
+        id: { type: integer }
+        kind: { type: string }
+    Note:
+      type: object
+      required: [id, text]
+      properties:
+        id: { type: integer }
+        text: { type: string }
+    NoteCreate:
+      type: object
+      required: [text]
+      additionalProperties: false
+      properties:
+        text: { type: string }
