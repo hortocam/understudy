@@ -9,7 +9,7 @@
  * The same report data drives both renderings: the human-readable text on `out` and one
  * structured log line through `logger` (FR-024).
  */
-import { createLogger, renderRefusal, renderStartupReport, type Logger } from "./logging.js";
+import { createLogger, renderStartupReport, type Logger } from "./logging.js";
 import { SqliteStore } from "./store/sqlite.js";
 import type { Store } from "./store/index.js";
 import { buildMockServer } from "./mock/route.js";
@@ -430,9 +430,10 @@ export async function createMock(
       close,
     };
   } catch (error) {
-    // FR-004/FR-024: a refusal is human-readable and names the cause; the structured log
-    // carries the same fact. Nothing was bound, so nothing has to be torn down.
-    out(renderRefusal(error));
+    // FR-004/FR-024: a refusal is emitted as one structured log line (machine-readable), and the
+    // caller renders it for a human — this library function does not write the human text itself,
+    // so a refusal reaches a terminal exactly once, at the process boundary (the CLI). Nothing
+    // was bound, so nothing has to be torn down.
     logger.error("refusing to start", {
       error: isObject(error) && "code" in error ? error.code : undefined,
       message: error instanceof Error ? error.message : String(error),

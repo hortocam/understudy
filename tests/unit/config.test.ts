@@ -58,7 +58,9 @@ describe("loadConfig defaults", () => {
   it("applies every documented default", () => {
     expect(config.server).toEqual({ port: 8080, host: "127.0.0.1", basePath: "" });
     expect(config.control).toEqual({ prefix: "/__understudy" });
-    expect(config.storage).toEqual({ driver: "sqlite", path: "./.understudy/state.db" });
+    // FU: `storage.path` resolves against the config file's directory (as `spec` already did), so
+    // the documented default is made absolute against `/tmp/proj` — the config dir, not the cwd.
+    expect(config.storage).toEqual({ driver: "sqlite", path: "/tmp/proj/.understudy/state.db" });
     expect(config.ids).toEqual({ generatedStart: 100000 });
   });
 
@@ -75,7 +77,10 @@ describe("loadConfig defaults", () => {
     );
     expect(explicit.server.port).toBe(9999);
     expect(explicit.server.host).toBe("0.0.0.0");
-    expect(explicit.storage.path).toBe("./custom.db");
+    // FU: previously asserted the raw `./custom.db`, i.e. the cwd-relative bug. The value is
+    // resolved against the config file's directory like `spec`; the explicit relative path is
+    // preserved as text but made absolute. See "storage path resolution" below.
+    expect(explicit.storage.path).toBe("/tmp/proj/custom.db");
     expect(explicit.ids.generatedStart).toBe(500000);
     expect(explicit.spec).toBe("https://example.test/openapi.json");
   });
@@ -174,6 +179,42 @@ describe("spec path resolution", () => {
   it("leaves a URL spec untouched", () => {
     const config = parseConfig("spec: https://example.test/openapi.json\noperations: [getPets]\n", "c.yaml");
     expect(config.spec).toBe("https://example.test/openapi.json");
+  });
+});
+
+describe("storage path resolution", () => {
+  // FU: `spec` already resolved against the config file's directory; `storage.path` did not, so
+  // `ustdy up --config sub/understudy.yaml` wrote the store relative to the process cwd rather than
+  // beside the config — a surprise for anyone whose config is not in the cwd.
+  it("resolves a relative storage.path against the config file, not the cwd", () => {
+    const dir = mkdtempSync(join(tmpdir(), "understudy-config-"));
+    const file = join(dir, "understudy.yaml");
+    writeFileSync(
+      file,
+      "spec: ./api.yaml\noperations: [GET /pets]\nstorage: { driver: sqlite, path: ./.understudy/state.db }\n",
+    );
+    const config = loadConfig(file);
+    expect(config.storage.path).toBe(resolve(dir, ".understudy/state.db"));
+  });
+
+  it("leaves an absolute storage.path untouched", () => {
+    const dir = mkdtempSync(join(tmpdir(), "understudy-config-"));
+    const file = join(dir, "understudy.yaml");
+    const absolute = join(dir, "elsewhere", "state.db");
+    writeFileSync(
+      file,
+      `spec: ./api.yaml\noperations: [GET /pets]\nstorage: { driver: sqlite, path: ${JSON.stringify(absolute)} }\n`,
+    );
+    expect(loadConfig(file).storage.path).toBe(absolute);
+  });
+
+  it("resolves the documented default against the config file too", () => {
+    // The default `./.understudy/state.db` is only meaningful relative to the config; a config with
+    // no `storage:` block must land its store beside itself, like a config that states the path.
+    const dir = mkdtempSync(join(tmpdir(), "understudy-config-"));
+    const file = join(dir, "understudy.yaml");
+    writeFileSync(file, "spec: ./api.yaml\noperations: [GET /pets]\n");
+    expect(loadConfig(file).storage.path).toBe(resolve(dir, ".understudy/state.db"));
   });
 });
 describe("wrong-shaped sections are refused, never defaulted (FR-005)", () => {

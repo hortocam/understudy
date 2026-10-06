@@ -173,7 +173,7 @@ keys and the reserved keys below are refused at startup.
 | `control.port` | integer, unset | Serve the control API on its own port instead of on the mock's. |
 | `control.host` | string, unset | Host for the separate control port (defaults to `server.host`). |
 | `storage.driver` | `"sqlite"` \| `"postgres"`, `"sqlite"` | **`postgres` is reserved** — accepted by the schema so the shape is stable, but selecting it refuses to start until the adapter ships. |
-| `storage.path` | string, `"./.understudy/state.db"` | SQLite file. Its directory is created if absent; an unwritable path refuses to start. |
+| `storage.path` | string, `"./.understudy/state.db"` | SQLite file, resolved **relative to the config file** (as `spec` is) — so `ustdy up --config sub/understudy.yaml` puts the store in `sub/`, not the process cwd. An absolute path is used as given. Its directory is created if absent; an unwritable path refuses to start. |
 | `ids.generatedStart` | integer, `100000` | First identity for records created over the API. A reserved range that must not overlap fixture-supplied identities (slice 2). |
 | `signing.alg` / `signing.header` | string (`hmac-sha256` / `X-Signature`) | **RESERVED** (under `signing`) — the shape of webhook HMAC signing (slice 4+), refused on presence for now. |
 | `signing` | object | **RESERVED** — accepted so the shape is stable, but selecting it is a startup refusal naming the key. Webhook HMAC signing lands with the webhook slices. |
