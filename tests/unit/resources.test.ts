@@ -165,3 +165,43 @@ describe("duplicate derived names (FR-007: never a silent fusion)", () => {
     expect(tag?.detail).toContain("/blogs/tags");
   });
 });
+describe("names that differ only by case (the same fusion one fold away)", () => {
+  /** ASCII-only lower-case, the fold SQLite applies to table identity (`sqlite3_stricmp`). */
+  const fold = (name: string): string => name.replace(/[A-Z]/g, (char) => char.toLowerCase());
+
+  async function derive() {
+    const loaded = await loadSpec(fixture("case-collision-api.yaml"));
+    const live = collectOperations(loaded.document);
+    return deriveModel(loaded.document, live, {});
+  }
+
+  it("renames both colliding collections so no two names fold together", async () => {
+    const model = await derive();
+    expect(model.resources.map((r) => r.collectionPath).sort()).toEqual(["/bars", "/foos"]);
+    const folded = model.resources.map((r) => fold(r.name));
+    expect(new Set(folded).size).toBe(folded.length);
+  });
+
+  it("reports the collision with both paths and the chosen names", async () => {
+    const model = await derive();
+    const reported = model.ambiguities.filter((ambiguity) => ambiguity.kind === "duplicate-resource-name");
+    expect(reported).toHaveLength(1);
+    const detail = reported[0]?.detail ?? "";
+    expect(detail).toContain("/foos");
+    expect(detail).toContain("/bars");
+    // The report names the ORIGINAL colliding names the document declared (`Foo`, `foo`)...
+    expect(detail).toContain("Foo");
+    expect(detail).toContain("foo");
+    // ...and the chosen names, one per colliding path.
+    for (const resource of model.resources) expect(detail).toContain(resource.name);
+    // The original names are not the chosen ones, so the collision is what is named, not the fix.
+    expect(model.resources.map((r) => r.name)).not.toContain("Foo");
+    expect(model.resources.map((r) => r.name)).not.toContain("foo");
+  });
+
+  it("is deterministic regardless of path order", async () => {
+    const a = (await derive()).resources.map((r) => `${r.collectionPath}=${r.name}`).sort();
+    const b = (await derive()).resources.map((r) => `${r.collectionPath}=${r.name}`).sort();
+    expect(a).toEqual(b);
+  });
+});
