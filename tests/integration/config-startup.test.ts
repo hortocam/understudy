@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ConfigRefusedError, ConfigLayerInvalidError, RecipeNotFoundError } from "../../src/errors.js";
 import type { RunningMock } from "../../src/index.js";
 import { runCli } from "../../src/cli/program.js";
+import { renderRefusal } from "../../src/logging.js";
 import { makeProject, startProject } from "../helpers/project.js";
 import { fixturePath } from "../helpers/mock.js";
 import { join } from "node:path";
@@ -20,17 +21,18 @@ describe("the four layers at startup (FR-001, FR-005)", () => {
   });
 
   it("refuses before binding anything, listing EVERY cause with file and key", async () => {
-    const out: string[] = [];
-    await expect(
-      startProject(
-        {
-          "dynamic/r.yaml": "entities:\n  Ghost: { count: 1 }\n",
-          "static/entities/venues.yaml": "entity: Venue\nrows:\n  - { id: 1, name: ab }\n",
-        },
-        { config: "recipe: r\nentities:\n  Specter: {}\n", mock: { out: (t) => out.push(t) } },
-      ),
-    ).rejects.toBeInstanceOf(ConfigRefusedError);
-    const text = out.join("\n");
+    // FU: the refusal's human rendering is emitted at the process boundary, not by `createMock`
+    // (which used to print it to `out`, so `up` produced three copies of one refusal). This test
+    // now checks the rendered text — the message the boundary prints — rather than a library sink.
+    const error = await startProject(
+      {
+        "dynamic/r.yaml": "entities:\n  Ghost: { count: 1 }\n",
+        "static/entities/venues.yaml": "entity: Venue\nrows:\n  - { id: 1, name: ab }\n",
+      },
+      { config: "recipe: r\nentities:\n  Specter: {}\n" },
+    ).catch((e: unknown) => e as Error);
+    expect(error).toBeInstanceOf(ConfigRefusedError);
+    const text = renderRefusal(error);
     expect(text).toContain("dynamic/r.yaml: entities.Ghost");
     expect(text).toContain("understudy.yaml: entities.Specter");
     expect(text).toContain("static/entities/venues.yaml: rows[0].name");

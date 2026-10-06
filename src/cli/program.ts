@@ -205,8 +205,9 @@ export function buildProgram(io: CliIo): Command {
             out: io.out,
           });
         } catch (error) {
-          // createMock has already printed the refusal; only the exit status remains.
-          throw new ControlRequestError(0, error instanceof Error ? error.message : String(error));
+          // The process boundary renders the refusal for a human, exactly once. `createMock` has
+          // only logged the structured line; this is the single human rendering.
+          throw new ControlRequestError(0, renderRefusal(error));
         }
 
         const client = new ControlClient(options.controlUrl ?? `${mock.controlUrl}${mock.controlPrefix}`);

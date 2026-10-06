@@ -4,7 +4,7 @@
  * operation. Also proves the wiring refuses to start on a T004 error instead of serving
  * a half-alive mock.
  */
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -15,7 +15,7 @@ import {
 } from "../../src/errors.js";
 import { createMock, type RunningMock } from "../../src/index.js";
 import { createLogger } from "../../src/logging.js";
-import { parseConfig } from "../../src/config/load.js";
+import { loadConfig, parseConfig } from "../../src/config/load.js";
 import { fixturePath, newStoreDir, storePath } from "../helpers/mock.js";
 
 let mock: RunningMock | undefined;
@@ -134,5 +134,28 @@ describe("startup wiring (FR-023, FR-024)", () => {
     await expect(
       createMock(config, { port: 0, out: () => {}, logger: createLogger({ write: () => {} }) }),
     ).rejects.toBeInstanceOf(EmptySelectionError);
+  });
+
+  it("opens a relative storage.path beside the config file, not the process cwd (FU)", async () => {
+    // `ustdy up --config sub/understudy.yaml` with `storage.path: ./.understudy/state.db` must put
+    // the store in `sub/`, exactly as `spec` already resolves against the config file's directory.
+    const dir = mkdtempSync(join(tmpdir(), "understudy-startup-"));
+    const sub = join(dir, "sub");
+    mkdirSync(sub, { recursive: true });
+    const configPath = join(sub, "understudy.yaml");
+    writeFileSync(
+      configPath,
+      [
+        `spec: ${fixturePath("inventory-api.yaml")}`,
+        "operations: [GET /inventory]",
+        "storage: { driver: sqlite, path: ./.understudy/state.db }",
+      ].join("\n"),
+    );
+    const config = loadConfig(configPath);
+    expect(config.storage.path).toBe(join(sub, ".understudy", "state.db"));
+
+    mock = await createMock(config, { port: 0, out: () => {}, logger: createLogger({ write: () => {} }) });
+    expect(existsSync(join(sub, ".understudy", "state.db"))).toBe(true);
+    expect(existsSync(join(dir, ".understudy", "state.db"))).toBe(false);
   });
 });
