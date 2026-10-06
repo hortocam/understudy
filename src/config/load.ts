@@ -142,23 +142,26 @@ function describeError(error: ErrorObject): { value: unknown; detail: string } {
   return { value: error.instancePath.length > 0 ? error.instancePath : error.keyword, detail: `${error.message ?? "is invalid"}${at}` };
 }
 
+/**
+ * Fill defaults for ABSENT sections only. A section that is present but the wrong shape is passed
+ * through untouched so validation refuses it (FR-005) — defaulting it would hide the mistake.
+ */
+function withDefaults(value: unknown, defaults: object): unknown {
+  if (value === undefined) return { ...defaults };
+  return isPlainObject(value) ? { ...defaults, ...value } : value;
+}
+
 function applyDefaults(raw: Record<string, unknown>): Record<string, unknown> {
-  const server = isPlainObject(raw.server) ? raw.server : {};
-  const control = isPlainObject(raw.control) ? raw.control : {};
-  const storage = isPlainObject(raw.storage) ? raw.storage : {};
-  const ids = isPlainObject(raw.ids) ? raw.ids : {};
-  const paths = isPlainObject(raw.paths) ? raw.paths : {};
-  const inference = isPlainObject(raw.inference) ? raw.inference : {};
   return {
     ...raw,
-    paths: { ...DEFAULT_PATHS, ...paths },
-    inference: { ...DEFAULT_INFERENCE, ...inference },
-    seed: typeof raw.seed === "number" ? raw.seed : 0,
-    entities: isPlainObject(raw.entities) ? raw.entities : {},
-    server: { ...DEFAULT_SERVER, ...server },
-    control: { ...DEFAULT_CONTROL, ...control },
-    storage: { ...DEFAULT_STORAGE, ...storage },
-    ids: { ...DEFAULT_IDS, ...ids },
+    paths: withDefaults(raw.paths, DEFAULT_PATHS),
+    inference: withDefaults(raw.inference, DEFAULT_INFERENCE),
+    seed: raw.seed === undefined ? 0 : raw.seed,
+    entities: raw.entities === undefined ? {} : raw.entities,
+    server: withDefaults(raw.server, DEFAULT_SERVER),
+    control: withDefaults(raw.control, DEFAULT_CONTROL),
+    storage: withDefaults(raw.storage, DEFAULT_STORAGE),
+    ids: withDefaults(raw.ids, DEFAULT_IDS),
   };
 }
 

@@ -47,6 +47,8 @@ export interface DeriveOptions {
   inference?: InferenceRules;
   /** Relationships supplied explicitly; the `configured` evidence seam (slice 2 wires config to it). */
   configuredRelationships?: RelationshipHint[];
+  /** `entities.<X>.idField` pins, keyed by the FINAL (disambiguated) collection name. */
+  idFields?: Record<string, string>;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -268,6 +270,7 @@ export function deriveModel(
   }
 
   disambiguateNames(resources, ambiguities);
+  applyIdFieldPins(resources, ambiguities, options.idFields ?? {});
   for (const resource of resources) {
     if (resource.instancePath) instancePathToResource.set(resource.instancePath, resource.name);
   }
@@ -310,6 +313,12 @@ function disambiguateNames(resources: Resource[], ambiguities: Ambiguity[]): voi
       let candidate = base;
       for (let n = 2; taken.has(candidate) || candidate === name; n += 1) candidate = `${base}${n}`;
       taken.add(candidate);
+      for (const ambiguity of ambiguities) {
+        if (ambiguity.path !== (resource.instancePath ?? resource.collectionPath) && ambiguity.path !== resource.collectionPath) continue;
+        if (ambiguity.kind === "duplicate-resource-name") continue;
+        if (ambiguity.subject === name) ambiguity.subject = candidate;
+        ambiguity.detail = ambiguity.detail.split(name).join(candidate);
+      }
       resource.name = candidate;
       renamed.push(`${resource.collectionPath} → ${candidate}`);
     }
@@ -319,6 +328,54 @@ function disambiguateNames(resources: Resource[], ambiguities: Ambiguity[]): voi
       subject: name,
       detail: `${group.length} distinct collections would all be named ${name} (${group.map((r) => r.collectionPath).join(", ")}); each was given a path-qualified name (${renamed.join("; ")}) — pin a schema title or rename them in the document to choose`,
     });
+  }
+}
+
+const IDENTITY_AMBIGUITIES: ReadonlySet<string> = new Set([
+  "identity-field-unknown",
+  "identity-space-unreservable",
+  "identity-pattern-unsupported",
+]);
+
+/**
+ * `entities.<X>.idField` makes a different property the collection's identity (the fixture layer
+ * already honours it). The identity facts — type, pattern, space — are re-read from that property
+ * and the identity ambiguities are re-reported against it, so live CRUD, generation and the report
+ * all agree with the fixtures.
+ */
+function applyIdFieldPins(resources: Resource[], ambiguities: Ambiguity[], pins: Record<string, string>): void {
+  for (const resource of resources) {
+    const pin = pins[resource.name];
+    if (pin === undefined || pin === resource.idField) continue;
+    const key = resource.instancePath ?? resource.collectionPath;
+    for (let i = ambiguities.length - 1; i >= 0; i -= 1) {
+      const a = ambiguities[i] as Ambiguity;
+      if (a.path === key && IDENTITY_AMBIGUITIES.has(a.kind)) ambiguities.splice(i, 1);
+    }
+    const element = elementSchema(resource.representationSchema);
+    const properties = element && isObject(element.properties) ? element.properties : undefined;
+    const property = properties && isObject(properties[pin]) ? properties[pin] : undefined;
+    resource.idField = pin;
+    resource.idType = property?.type === "string" ? "string" : "integer";
+    resource.idSpace = idSpaceOf(property, resource.idType);
+    delete resource.idPattern;
+    if (typeof property?.pattern === "string") resource.idPattern = property.pattern;
+    if (resource.idSpace === "opaque") {
+      ambiguities.push({
+        kind: "identity-space-unreservable",
+        path: key,
+        subject: resource.name,
+        detail: `${resource.name}'s identity is a string with no declared uuid format or pattern, so no range can be reserved within it; identities fall back to opaque short ids and are kept distinct from fixtures by a membership check`,
+      });
+    }
+    if (resource.idPattern !== undefined && resource.idType === "string" && !patternSupported(resource.idPattern)) {
+      ambiguities.push({
+        kind: "identity-pattern-unsupported",
+        path: key,
+        ...(resource.operations.read?.operationId !== undefined ? { operationId: resource.operations.read.operationId } : {}),
+        detail: `${resource.name} declares identity pattern ${resource.idPattern}, which the mock's generator cannot satisfy; identities fall back to an opaque short id`,
+      });
+    }
   }
 }
 
@@ -435,7 +492,10 @@ function deriveResource(
     operations,
     nameSource: title ? "schema-title" : "path-segment",
   };
-  if (instance) resource.instancePath = instance.instancePath;
+  if (instance) {
+    resource.instancePath = instance.instancePath;
+    resource.instanceParam = instance.param;
+  }
   if (representationSchema !== undefined) resource.representationSchema = representationSchema;
   if (createOp) {
     const createSchema = requestSchema(createOp.operation);

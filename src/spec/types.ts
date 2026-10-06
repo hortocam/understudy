@@ -84,6 +84,8 @@ export interface Resource {
   name: string;
   collectionPath: string;
   instancePath?: string;
+  /** The path parameter that names an instance in `instancePath` (may differ from `idField`). */
+  instanceParam?: string;
   idField: string;
   idType: "integer" | "string";
   idPattern?: string;

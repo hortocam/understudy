@@ -1,0 +1,24 @@
+openapi: 3.0.1
+info: { title: idField API, version: 1.0.0 }
+paths:
+  /parts:
+    get:
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Part" } } } } } }
+    post:
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/Part" } } } }
+      responses: { "201": { description: created, content: { application/json: { schema: { $ref: "#/components/schemas/Part" } } } } }
+  /parts/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    get:
+      responses: { "200": { description: ok, content: { application/json: { schema: { $ref: "#/components/schemas/Part" } } } } }
+    delete:
+      responses: { "204": { description: gone } }
+components:
+  schemas:
+    Part:
+      title: Part
+      type: object
+      properties:
+        id: { type: integer }
+        sku: { type: string, pattern: "^SKU-[0-9]{8}$" }
+        name: { type: string }

@@ -266,7 +266,7 @@ export function buildMockServer(context: RouteContext): FastifyInstance {
         params[name] = match[index + 1] as string;
       });
     }
-    const identity = params[binding.resource.idField] ?? Object.values(params)[0] ?? "";
+    const identity = params[binding.resource.instanceParam ?? binding.resource.idField] ?? params[binding.resource.idField] ?? Object.values(params)[0] ?? "";
 
     switch (binding.kind) {
       case "list": {

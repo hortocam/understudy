@@ -116,7 +116,10 @@ export async function createMock(
         field,
       })),
     );
-    const model = deriveModel(spec.document, selection.live, { configuredRelationships, inference: config.inference });
+    const idFields = Object.fromEntries(
+      Object.entries(config.entities).flatMap(([name, entity]) => (entity.idField !== undefined ? [[name, entity.idField]] : [])),
+    );
+    const model = deriveModel(spec.document, selection.live, { configuredRelationships, inference: config.inference, idFields });
 
     // 3b. Load the four configuration layers (FR-001) and reconcile them against the document
     // (FR-005): every cause is collected, so one refusal lists the whole problem. Nothing is

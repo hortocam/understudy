@@ -175,3 +175,28 @@ describe("spec path resolution", () => {
     expect(config.spec).toBe("https://example.test/openapi.json");
   });
 });
+describe("wrong-shaped sections are refused, never defaulted (FR-005)", () => {
+  const base = "spec: ./openapi.yaml\noperations:\n  - GET /x\n";
+  const cases: Array<[string, string, string]> = [
+    ["seed", 'seed: "42"\n', "seed"],
+    ["paths", "paths: 5\n", "paths"],
+    ["inference", "inference: []\n", "inference"],
+    ["entities", "entities: []\n", "entities"],
+    ["server", "server: 3\n", "server"],
+    ["control", "control: yes\n", "control"],
+    ["storage", "storage: [a]\n", "storage"],
+    ["ids", "ids: nope\n", "ids"],
+  ];
+  for (const [key, text, named] of cases) {
+    it(`refuses a malformed \`${key}\`, naming it`, () => {
+      const error = capture(() => parseConfig(base + text, "/tmp/understudy.yaml"));
+      expect(error).toBeInstanceOf(ConfigInvalidError);
+      expect((error as Error).message).toContain(named);
+    });
+  }
+
+  it("still defaults an ABSENT section", () => {
+    const config = parseConfig(base, "/tmp/understudy.yaml");
+    expect(config.seed).toBe(0);
+  });
+});
