@@ -8,13 +8,14 @@
 import { Ajv2020, type ValidateFunction } from "ajv/dist/2020.js";
 import addFormatsDefault from "ajv-formats";
 import { elementSchemaOf, type Schema } from "./schema-util.js";
-import type { Resource } from "./types.js";
+import type { Ambiguity, Resource } from "./types.js";
 
 const addFormats = addFormatsDefault as unknown as (ajv: unknown) => void;
 const ajv = new Ajv2020({ allErrors: true, strict: false, coerceTypes: false });
 addFormats(ajv);
 
 const cache = new WeakMap<object, ValidateFunction | null>();
+const failures = new WeakMap<object, string>();
 
 function compile(schema: Schema): ValidateFunction | undefined {
   const hit = cache.get(schema);
@@ -23,10 +24,31 @@ function compile(schema: Schema): ValidateFunction | undefined {
     const validator = ajv.compile(schema);
     cache.set(schema, validator);
     return validator;
-  } catch {
+  } catch (error) {
+    failures.set(schema, error instanceof Error ? error.message : String(error));
     cache.set(schema, null);
     return undefined;
   }
+}
+
+/**
+ * Collections whose representation schema Ajv cannot compile. Their records cannot be judged
+ * against the document, so SC-004 is not enforced for them — which must be reported, not read as
+ * "conforms" (principle VI: inference and its limits are always visible).
+ */
+export function uncheckableResources(resources: readonly Resource[]): Ambiguity[] {
+  const found: Ambiguity[] = [];
+  for (const resource of resources) {
+    const element = elementSchemaOf(resource);
+    if (!element || compile(element)) continue;
+    found.push({
+      kind: "conformance-unchecked",
+      path: resource.collectionPath,
+      subject: resource.name,
+      detail: `${resource.name}'s schema cannot be compiled (${failures.get(element) ?? "unknown reason"}), so its records cannot be checked against it: generated and fixture rows are NOT verified to conform`,
+    });
+  }
+  return found;
 }
 
 /** Human-readable violations of a record against the resource's schema; empty when it conforms. */

@@ -32,7 +32,8 @@ function capture(fn: () => unknown): unknown {
 describe("config schema", () => {
   it("keeps the inlined schema identical to the checked-in contract", () => {
     const contract = JSON.parse(readFileSync(contractPath, "utf8")) as unknown;
-    expect(configSchema).toEqual(contract);
+    // byte-for-byte (key order included), as the control drift test does — not merely deep-equal
+    expect(JSON.stringify(configSchema)).toBe(JSON.stringify(contract));
   });
 
   it("derives from slice 2's contract, and leaves slice 1's file in place as history", () => {
@@ -198,5 +199,20 @@ describe("wrong-shaped sections are refused, never defaulted (FR-005)", () => {
   it("still defaults an ABSENT section", () => {
     const config = parseConfig(base, "/tmp/understudy.yaml");
     expect(config.seed).toBe(0);
+  });
+});
+
+describe("`entities.<X>.writes: actions-only` is reserved, not silently inert (constitution IX)", () => {
+  it("refuses it, naming the key", () => {
+    const error = capture(() =>
+      parseConfig("spec: ./openapi.yaml\noperations:\n  - GET /x\nentities:\n  Order: { writes: actions-only }\n", "/tmp/understudy.yaml"),
+    );
+    expect(error).toBeInstanceOf(ReservedConfigError);
+    expect((error as Error).message).toContain("entities.Order.writes");
+  });
+
+  it("still accepts `writes: api`", () => {
+    const config = parseConfig("spec: ./openapi.yaml\noperations:\n  - GET /x\nentities:\n  Order: { writes: api }\n", "/tmp/understudy.yaml");
+    expect(config.entities.Order?.writes).toBe("api");
   });
 });

@@ -138,7 +138,9 @@ export type AmbiguityKind =
   | "clock-unpinned"
   | "lookup-only"
   | "import-source"
-  | "duplicate-resource-name";
+  | "duplicate-resource-name"
+  | "conformance-unchecked"
+  | "cascade-removes-fixtures";
 
 export interface Ambiguity {
   kind: AmbiguityKind;

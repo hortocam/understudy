@@ -146,3 +146,26 @@ describe("fixtures refuse rather than guess", () => {
     expect(readFileSync(join(dir, "static/entities/venues.yaml"), "utf8")).toContain("Test Arena");
   });
 });
+
+describe("a pinned onDelete: cascade can remove another collection's fixture rows — reported, not silent (A4)", () => {
+  it("names the relation in the startup report, and the cascade really happens", async () => {
+    const { startGen } = await import("../helpers/project.js");
+    const { mock } = await startGen(undefined, {
+      config: "entities:\n  Event:\n    relations:\n      venueId: { to: Venue.id, onDelete: cascade }\n",
+    });
+    try {
+      const found = mock.report.ambiguities.filter((a) => a.kind === "cascade-removes-fixtures");
+      expect(found).toHaveLength(1);
+      expect(found[0]?.subject).toBe("Event.venueId");
+      expect(found[0]?.detail).toContain("Venue");
+      expect(found[0]?.detail).toContain("fixture");
+
+      expect(mock.store.countByOrigin().Event?.static).toBe(2);
+      const response = await fetch(`${mock.baseUrl}/venues/1`, { method: "DELETE" });
+      expect(response.status).toBe(204);
+      expect(mock.store.countByOrigin().Event?.static).toBe(1);
+    } finally {
+      await mock.close();
+    }
+  });
+});

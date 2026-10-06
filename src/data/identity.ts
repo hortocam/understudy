@@ -103,7 +103,19 @@ export function planIdentity(input: PlanIdentityInput): { plan: IdentityPlan; re
     let start = input.globalStart;
     let end: number | undefined;
     let declared = `generatedStart=${start}`;
-    let span = `${render(start)}..`;
+    let span = "";
+    try {
+      span = `${render(start)}..`;
+    } catch (error) {
+      if (!(error instanceof IdentitySpaceExhaustedError)) throw error;
+      // The pattern cannot reach the default start (a narrow fixed run): a structured refusal,
+      // never a throw out of planning. An explicit span below overrides the start entirely.
+      if (reserved === undefined) {
+        refuse(
+          `${resource.name}: the pattern ${resource.idPattern} renders too few identities to reach the generated start ${start}; lower ids.generatedStart or reserve a span inside the pattern with entities.${resource.name}.ids.reserved ('<from>..<to>')`,
+        );
+      }
+    }
     if (reserved !== undefined) {
       const [from, to, ...rest] = reserved.split("..");
       const a = from === undefined ? undefined : identityCounter(resource, from);

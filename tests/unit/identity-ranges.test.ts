@@ -191,3 +191,27 @@ describe("FR-018 — API-written identities collide with neither fixture nor gen
     expect(created.every((id) => !s.list(resource.name).some((r) => r.identity === id && r.origin !== "runtime"))).toBe(true);
   });
 });
+
+describe("a pattern narrower than the default generated start is a structured refusal, not a throw", () => {
+  const narrow = formatted("Gate", "^G-[0-9]{3}$");
+
+  it("refuses with a cause that names the resource and the way out", () => {
+    const planned = planIdentity({ resource: narrow, globalStart: 100000, fixtureIds: [] });
+    expect(planned.refusals).toHaveLength(1);
+    expect(planned.refusals[0]?.key).toBe("entities.Gate.ids.reserved");
+    expect(planned.refusals[0]?.cause).toContain("Gate");
+    expect(planned.refusals[0]?.cause).toContain("100000");
+    expect(planned.refusals[0]?.cause).toMatch(/ids\.generatedStart|reserved/);
+  });
+
+  it("plans cleanly when the start fits inside the pattern's space", () => {
+    const planned = planIdentity({ resource: narrow, globalStart: 100, fixtureIds: [] });
+    expect(planned.refusals).toEqual([]);
+    expect(planned.plan.reserved).toBe("G-100..");
+  });
+
+  it("plans cleanly when an explicit span is reserved", () => {
+    const planned = planIdentity({ resource: narrow, entity: { ids: { reserved: "G-500..G-599" } }, globalStart: 100000, fixtureIds: [] });
+    expect(planned.refusals).toEqual([]);
+  });
+});

@@ -103,3 +103,15 @@ describe("US5 — children attach to real parents", () => {
     expect(out.join("\n")).toContain("undetermined links");
   });
 });
+
+describe("perParent over an empty parent is said, not silent", () => {
+  it("notes that no children were generated because the parent has no records", async () => {
+    const { mock } = await startGen("empty-parent", {
+      project: "gen-empty-parent",
+    });
+    mocks.push(mock);
+    expect(mock.store.countByOrigin().Event?.generated ?? 0).toBe(0);
+    const notes = mock.report.generation?.notes ?? [];
+    expect(notes.some((n) => n.includes("Event") && n.includes("Venue") && /no .*record/.test(n))).toBe(true);
+  });
+});

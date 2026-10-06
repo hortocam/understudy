@@ -6,7 +6,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { configSchema } from "../../src/config/schema.js";
+import { configSchema, layerValidator } from "../../src/config/schema.js";
 
 const readme = readFileSync(fileURLToPath(new URL("../../README.md", import.meta.url)), "utf8");
 type Schema = { properties?: Record<string, Schema>; additionalProperties?: Schema | boolean; oneOf?: Schema[]; $ref?: string };
@@ -49,7 +49,7 @@ describe("every contract key is documented (constitution IX)", () => {
       for (const branch of schema.oneOf ?? []) collect(branch);
       if (schema.additionalProperties && typeof schema.additionalProperties === "object") collect(schema.additionalProperties);
     };
-    for (const name of ["FixtureFile", "RecipeEntity", "Recipe", "FieldRule", "GeneratorDef"]) collect(defs[name] as Schema);
+    for (const name of ["FixtureFile", "RecipeEntity", "Recipe", "FieldRule", "GeneratorDef", "BehaviorFile", "ImportMapping"]) collect(defs[name] as Schema);
     // behaviour/imports keys are documented in the layers table + the shipped .example files
     const missing = [...names].filter((n) => !readme.includes(n));
     expect(missing).toEqual([]);
@@ -59,5 +59,28 @@ describe("every contract key is documented (constitution IX)", () => {
     for (const name of ["LookupFile", "EntitiesFile", "Recipe", "BehaviorFile", "ImportMapping", "FieldRule", "GeneratorDef"]) {
       expect((defs[name] as { examples?: unknown[] }).examples?.length, name).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("every example in the contract is valid against its own definition (constitution IX: runnable)", () => {
+  const withExamples = Object.entries(defs).filter(([, def]) => Array.isArray((def as { examples?: unknown[] }).examples));
+
+  it.each(withExamples.map(([name]) => name))("every `%s` example validates", (name) => {
+    const examples = (defs[name] as { examples: unknown[] }).examples;
+    const validate = layerValidator(name as Parameters<typeof layerValidator>[0]);
+    for (const example of examples) {
+      expect(validate(example), `${name}: ${JSON.stringify(validate.errors)}`).toBe(true);
+    }
+  });
+});
+
+describe("the README's behaviour example is runnable (valid against the contract)", () => {
+  it("validates", async () => {
+    const { parse } = await import("yaml");
+    const match = /<!-- behavior-example -->\n```yaml\n([\s\S]*?)```/.exec(readme);
+    expect(match, "README must carry the <!-- behavior-example --> block").not.toBeNull();
+    const validate = layerValidator("BehaviorFile");
+    const value = parse(match?.[1] ?? "");
+    expect(validate(value), JSON.stringify(validate.errors)).toBe(true);
   });
 });

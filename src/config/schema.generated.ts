@@ -97,7 +97,7 @@ export const configSchema: Record<string, unknown> = {
               "actions-only"
             ],
             "default": "api",
-            "description": "'actions-only' refuses API writes for this collection even if the document declares them (used from slice 5)."
+            "description": "'actions-only' refuses API writes for this collection even if the document declares them (reserved: refused at startup until slice 5)."
           },
           "ids": {
             "type": "object",
@@ -1404,7 +1404,7 @@ export const configSchema: Record<string, unknown> = {
           "subscriptions": [
             {
               "name": "inventory-sold",
-              "true": "Inventory.updated",
+              "on": "Inventory.updated",
               "when": "$exists(changed[$='statusId']) and after.statusId = 3",
               "target": "pos",
               "delay": {
@@ -1419,7 +1419,7 @@ export const configSchema: Record<string, unknown> = {
             },
             {
               "name": "inventory-created",
-              "true": "POST /inventory",
+              "on": "POST /inventory",
               "target": "pos",
               "template": "./templates/inventory-created.jsonata"
             }

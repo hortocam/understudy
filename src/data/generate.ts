@@ -226,6 +226,9 @@ export async function generate(input: GenerateInput): Promise<GenerationSummary>
     } else {
       const parentResource = resources.get(countPlan.parent) as Resource;
       const parents = pool.values(countPlan.parent, parentResource.idField);
+      if (parents.length === 0) {
+        base.notes.push(`${name}: perParent ${countPlan.parent}, but ${countPlan.parent} has no records (generate it, or declare fixtures for it); 0 ${name} generated`);
+      }
       const draw = countDrawer({ entity: countPlan.parent, range: countPlan.range, distribution: countPlan.distribution as "uniform" | "zipf" }, stream.rng);
       for (const parentValue of parents) {
         const n = draw();

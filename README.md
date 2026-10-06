@@ -124,7 +124,7 @@ keys and the reserved keys below are refused at startup.
 | `recipe` | string, unset | The recipe applied at start (a file under `paths.dynamic`, without extension). Absent means fixtures only. Overridden by `--recipe`. |
 | `seed` | integer, `0` | The global seed. A recipe's own `seed` overrides it and `--seed` overrides both. Per-collection streams derive from it, so adding a collection moves no existing one. |
 | `entities.<Name>.idField` | string | The identity property (defaults to the derived one). |
-| `entities.<Name>.writes` | `"api"` \| `"actions-only"`, `"api"` | `actions-only` is reserved for slice 5. |
+| `entities.<Name>.writes` | `"api"` \| `"actions-only"`, `"api"` | `actions-only` is reserved: it is refused at startup until slice 5. |
 | `entities.<Name>.ids.generatedStart` | integer | First generated/API identity for an **integer** identity space (wins over `ids.generatedStart`). Fixture identities at or above it refuse to start. |
 | `entities.<Name>.ids.reserved` | string | An explicit span for a non-integer space, written `<from>..<to>`: `EVT-100000..EVT-199999` (formatted/prefixed) or `a0000000..afffffff` (the leading hex digits of a uuid). Overlap with a fixture identity refuses to start naming the collection. |
 | `entities.<Name>.relations.<field>.to` | `Collection.field` | Pin a link: it wins over every inferred one and the report says it was `configured`. The target must be that collection's identity. |
@@ -162,7 +162,7 @@ inference: { idSuffixes: [Id, _id], ambiguousNames: [externalId, referenceId, re
 entities:
   Event:
     idField: id
-    writes: api                            # actions-only: reserved for slice 5
+    writes: api                            # actions-only: reserved (refused until slice 5)
     ids: { generatedStart: 500000 }        # an integer identity space
     relations:
       venueId: { to: Venue.id, onDelete: restrict }   # restrict | cascade | setNull
@@ -181,6 +181,32 @@ file is validated against the one contract and a mistake refuses to start as `fi
 | Recipes | `dynamic/<name>.yaml` | The switchable dataset; the file name is the recipe name. |
 | Behaviour | `behavior/*.yaml` | **Parsed and validated only** (webhook targets, subscriptions, actions, reactions, simulations); acted on in slices 4–5. `${NAME:-default}` stays text — secrets come from the environment, never a file. |
 | Imports | `imports/*.mapping.yaml` | **Shape validated only**; import execution is slice 3. |
+
+<!-- behavior-example -->
+```yaml
+# behavior/webhooks.yaml — validated now, acted on in slices 4–5
+targets:
+  pos:
+    url: ${USTDY_WEBHOOK_POS_URL:-http://localhost:9000/hooks/pos}
+    headers: { X-Source: mock }
+    retry: { max: 5, backoff: exponential, baseMs: 500, jitterMs: 200 }
+    timeoutMs: 5000
+subscriptions:
+  - { name: inventory-sold, on: Inventory.updated, target: pos }
+actions:
+  sell:
+    description: Sell one ticket
+    params:
+      quantity: { type: integer, optional: true, default: 1 }
+    steps:
+      - select: { as: ticket, entity: Inventory, pick: random }
+      - fail_if_empty: { var: ticket, code: 409, message: nothing to sell }
+simulations:
+  steady:
+    seed: 7
+    rules:
+      - { run: sell, every: { range: [20s, 5m] }, probability: 0.8 }
+```
 
 ```yaml
 # static/entities/venues.yaml — keys: entity, idField, rows

@@ -17,6 +17,7 @@ import { controlApiBytes } from "./control/openapi.js";
 import { buildControlInstance } from "./control/server.js";
 import { loadSpec } from "./spec/load.js";
 import { selectOperations } from "./spec/operations.js";
+import { uncheckableResources } from "./spec/conform.js";
 import { buildStartupReport } from "./spec/report.js";
 import { deriveModel } from "./spec/resources.js";
 import { loadBehavior } from "./config/layers/behavior.js";
@@ -120,6 +121,8 @@ export async function createMock(
       Object.entries(config.entities).flatMap(([name, entity]) => (entity.idField !== undefined ? [[name, entity.idField]] : [])),
     );
     const model = deriveModel(spec.document, selection.live, { configuredRelationships, inference: config.inference, idFields });
+
+    model.ambiguities.push(...uncheckableResources(model.resources));
 
     // 3b. Load the four configuration layers (FR-001) and reconcile them against the document
     // (FR-005): every cause is collected, so one refusal lists the whole problem. Nothing is
@@ -238,6 +241,21 @@ export async function createMock(
         detail: `${table} is a lookup table that names no collection of the live operations: it is held in memory for 'lookup:' rules and is neither stored nor served`,
       });
     }
+    // A pinned `onDelete: cascade` is real referential behaviour (A4): one API DELETE of a parent
+    // also removes child rows — including the CHILD collection's fixture rows. Said, not silent.
+    const staticCounts = store.countByOrigin();
+    for (const [from, entity] of Object.entries(config.entities)) {
+      for (const [field, relation] of Object.entries(entity.relations ?? {})) {
+        if (relation.onDelete !== "cascade" || (staticCounts[from]?.static ?? 0) === 0) continue;
+        const parent = relation.to.split(".")[0] as string;
+        model.ambiguities.push({
+          kind: "cascade-removes-fixtures",
+          subject: `${from}.${field}`,
+          detail: `${from}.${field} is pinned onDelete: cascade, so an API DELETE of a ${parent} also deletes the ${from} rows that reference it — including ${from}'s fixture rows (${staticCounts[from]?.static} declared); fixtures are immutable only against writes to themselves, not against this cascade`,
+        });
+      }
+    }
+    report.ambiguities.push(...model.ambiguities.filter((a) => a.kind === "cascade-removes-fixtures" && !report.ambiguities.includes(a)));
     report.ambiguities.push(...model.ambiguities.filter((a) => a.kind === "lookup-only" && !report.ambiguities.includes(a)));
     report.origins = store.countByOrigin();
 

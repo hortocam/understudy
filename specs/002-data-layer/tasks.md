@@ -908,3 +908,30 @@ nowhere.
   policy denial; not retried, not worked around). No vendor measurement exists, and none is
   invented — see `specs/002-data-layer/live-derivation.md` for the status and the one command that
   completes it. The outcome file is a **new** document (the approved `research.md` is not edited).
+
+### Review round 1 (coordinator review of PR 2; changes requested, T087 left to the coordinator)
+
+- **BLOCKER — duplicate resource names.** The live run found 118 collections but 77 unique names;
+  everything keyed by name (store table, identity space, plan) fused them. `deriveModel` now
+  renames **every** colliding collection to a deterministic path-qualified name (`/shops/tags` →
+  `ShopsTag`; none keeps the bare name, so nothing quietly "wins"; a numeric suffix breaks any
+  residual tie) and reports a `duplicate-resource-name` ambiguity naming the colliding paths. The
+  CI repro is `tests/fixtures/duplicate-names-api.yaml` (two `Invoice` titles with different
+  idField/paging, two untitled `…/tags`); `tests/live` line 80 is unchanged and its CI mirror is in
+  `plan.test.ts`. Configuration refers to the **final** name (an unknown name is refused, loudly).
+- **MAJOR — raw config shape.** Defaults now fill ABSENT sections only; a present-but-wrong-shaped
+  `seed`/`paths`/`inference`/`entities`/`server`/`control`/`storage`/`ids` refuses, naming the key.
+- **MAJOR — `entities.<X>.idField`.** Wired into derivation (identity type/pattern/space re-read
+  from the pinned property, identity ambiguities re-reported) and into live CRUD. `Resource.instanceParam`
+  records the path parameter that addresses an instance, so routing no longer assumes it equals the
+  identity field (this also fixes a nested instance path binding the first parameter).
+- **Minors.** `entities.<X>.writes: actions-only` → `ReservedConfigError`. An uncompilable schema →
+  `conformance-unchecked` ambiguity (SC-004 limit is visible). A pattern too narrow to reach the
+  generated start → structured refusal, not a throw. `perParent` over an empty parent → a note.
+  `BehaviorFile` examples fixed (`on:` not `"true":`); `docs-keys.test.ts` now validates every
+  contract example and a README behaviour example, and covers `BehaviorFile`/`ImportMapping` keys.
+  Config contract drift test is byte-equal. A pinned `onDelete: cascade` that removes the child's
+  fixture rows is **accepted as a consequence of real FK behaviour (A4) and reported** at startup
+  (`cascade-removes-fixtures`).
+- **Not done here (by design):** T087 — the coordinator re-runs `test:live` against the real
+  document and commits `live-derivation-run.md`.

@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { generateRecord } from "../../src/data/record.js";
 import { GenerationRefusedError } from "../../src/errors.js";
-import { conformanceErrors } from "../../src/spec/conform.js";
+import { conformanceErrors, uncheckableResources } from "../../src/spec/conform.js";
 import { makeEnv, resourceOf } from "../helpers/env.js";
 
 const properties = {
@@ -88,5 +88,21 @@ describe("every generated record conforms to the document's schema (FR-014, SC-0
     const error = await generateRecord({ resource }, env, 1).catch((e) => e as Error);
     expect(error).toBeInstanceOf(GenerationRefusedError);
     expect((error as Error).message).toContain("weird");
+  });
+});
+
+describe("a schema Ajv cannot compile is reported, never silently treated as conforming (SC-004)", () => {
+  it("names the collection and the reason", () => {
+    const bad = resourceOf("Broken", { ref: { $ref: "#/components/schemas/Missing" } });
+    const fine = resourceOf("Fine", { name: { type: "string" } });
+    const found = uncheckableResources([fine, bad]);
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatchObject({ kind: "conformance-unchecked", subject: "Broken" });
+    expect(found[0]?.detail).toContain("Broken");
+    expect(found[0]?.detail).toMatch(/cannot be checked|cannot be compiled/);
+  });
+
+  it("reports nothing when every schema compiles", () => {
+    expect(uncheckableResources([resourceOf("Fine", { name: { type: "string" } })])).toEqual([]);
   });
 });

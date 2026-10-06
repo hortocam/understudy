@@ -178,6 +178,14 @@ function checkReserved(raw: Record<string, unknown>, config: UnderstudyConfig): 
       'the virtual clock is a later slice (6); only "real" is implemented — omit the key or use "real"',
     );
   }
+  for (const [name, entity] of Object.entries(config.entities)) {
+    if (entity.writes === "actions-only") {
+      throw new ReservedConfigError(
+        `entities.${name}.writes`,
+        'refusing API writes is a later slice (5); only "api" is implemented — omit the key or use "api"',
+      );
+    }
+  }
   if (config.storage.driver === "postgres") {
     throw new ReservedConfigError(
       "storage.driver",
