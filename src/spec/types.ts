@@ -135,7 +135,8 @@ export type AmbiguityKind =
   | "unpaged-large-collection"
   | "clock-unpinned"
   | "lookup-only"
-  | "import-source";
+  | "import-source"
+  | "duplicate-resource-name";
 
 export interface Ambiguity {
   kind: AmbiguityKind;

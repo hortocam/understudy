@@ -265,11 +265,61 @@ export function deriveModel(
       pathItemParameters.get(collectionPath),
     );
     resources.push(resource);
-    if (instance) instancePathToResource.set(instance.instancePath, resource.name);
+  }
+
+  disambiguateNames(resources, ambiguities);
+  for (const resource of resources) {
+    if (resource.instancePath) instancePathToResource.set(resource.instancePath, resource.name);
   }
 
   const relationships = inferRelationships(document, resources, instancePathToResource, options, ambiguities);
   return { resources, relationships, ambiguities };
+}
+
+/** A path-qualified name: every literal segment, PascalCased, the last one singular (`/shops/tags` → `ShopsTag`). */
+function qualifiedName(collectionPath: string): string {
+  const literal = segments(collectionPath).filter((segment) => !isParamSegment(segment));
+  return literal
+    .map((segment, index) => capitalise(index === literal.length - 1 ? singularise(segment) : segment))
+    .join("")
+    .replace(/[^A-Za-z0-9_]/g, "");
+}
+
+/**
+ * Two distinct collections must never share a name: the store, identity spaces, plan and config
+ * are all keyed by it, so a shared name would fuse them silently. Every colliding resource is
+ * renamed to a path-qualified, deterministic name (none keeps the bare name, so nothing quietly
+ * "wins"), and the collision is reported with the colliding paths (FR-007).
+ */
+function disambiguateNames(resources: Resource[], ambiguities: Ambiguity[]): void {
+  const byName = new Map<string, Resource[]>();
+  for (const resource of resources) {
+    const list = byName.get(resource.name) ?? [];
+    list.push(resource);
+    byName.set(resource.name, list);
+  }
+  const taken = new Set<string>(
+    [...byName.entries()].filter(([, group]) => group.length === 1).map(([name]) => name),
+  );
+  for (const name of [...byName.keys()].sort()) {
+    const group = (byName.get(name) ?? []).slice().sort((a, b) => a.collectionPath.localeCompare(b.collectionPath));
+    if (group.length < 2) continue;
+    const renamed: string[] = [];
+    for (const resource of group) {
+      const base = qualifiedName(resource.collectionPath) || name;
+      let candidate = base;
+      for (let n = 2; taken.has(candidate) || candidate === name; n += 1) candidate = `${base}${n}`;
+      taken.add(candidate);
+      resource.name = candidate;
+      renamed.push(`${resource.collectionPath} → ${candidate}`);
+    }
+    ambiguities.push({
+      kind: "duplicate-resource-name",
+      path: group[0]?.collectionPath ?? "",
+      subject: name,
+      detail: `${group.length} distinct collections would all be named ${name} (${group.map((r) => r.collectionPath).join(", ")}); each was given a path-qualified name (${renamed.join("; ")}) — pin a schema title or rename them in the document to choose`,
+    });
+  }
 }
 
 /** The identity space an identity property lives in (FR-017): declared type + format + pattern. */

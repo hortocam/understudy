@@ -144,3 +144,13 @@ describe("generation plan: counts and refusals", () => {
     expect(plan.refusals[0]?.cause).toMatch(/bParentId/);
   });
 });
+
+describe("duplicate derived names reach the plan whole (mirror of the opt-in live assertion)", () => {
+  it("plan.order covers every derived collection — none vanishes by name", async () => {
+    const model = await derive("duplicate-names-api.yaml");
+    const { order } = buildGenerationPlan({ model });
+    expect(model.resources).toHaveLength(4);
+    expect(order).toHaveLength(model.resources.length);
+    expect(new Set(order).size).toBe(model.resources.length);
+  });
+});
