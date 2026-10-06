@@ -12,6 +12,7 @@ import {
   IdentitySpaceExhaustedError,
   InvariantViolatedError,
   RecipeNotFoundError,
+  ReservedTableNameError,
   UnknownGeneratorError,
   ConfigUnparseableError,
   EmptySelectionError,
@@ -45,6 +46,7 @@ describe("error taxonomy", () => {
     { error: new FixtureConformanceError("static/venues.yaml", "Venue", "1", "rows[0].name", "must be string"), value: "static/venues.yaml", code: "FIXTURE_NONCONFORMING" },
     { error: new GenerationRefusedError("Inventory", "eventId", "the parent collection Event has no records"), value: "Inventory", code: "GENERATION_REFUSED" },
     { error: new ConfigRefusedError([{ file: "a.yaml", key: "k1", cause: "bad" }, { file: "b.yaml", key: "k2", cause: "worse" }]), value: "k1", code: "CONFIG_REFUSED" },
+    { error: new ReservedTableNameError("_requests", "_requests", ["_understudy_meta", "_requests", "_id_ranges"]), value: "_requests", code: "RESERVED_TABLE_NAME" },
   ];
 
   it.each(cases)("$code names its offending value", ({ error, value, code }) => {

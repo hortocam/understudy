@@ -9,7 +9,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
 import { createHash } from "node:crypto";
-import { StoreSchemaConflictError, StoreUnwritableError } from "../errors.js";
+import { StoreSchemaConflictError, StoreUnwritableError, ReservedTableNameError } from "../errors.js";
 import {
   ReferenceViolationError,
   type IdRange,
@@ -144,6 +144,11 @@ export class SqliteStore implements Store {
   }
 
   ensureResource(resource: string, options?: ResourceOptions): void {
+    // A resource's table is named after it; the tool's own tables (`_understudy_meta`,
+    // `_requests`, `_id_ranges`) are reserved by EXACT name. Reaching the DDL with one of those
+    // names would `CREATE TABLE IF NOT EXISTS` past the existing tool table and die later on a
+    // missing column — an opaque driver error. Refuse here, naming the collision (VI).
+    if (META_TABLES.has(resource)) throw new ReservedTableNameError(resource, resource, [...META_TABLES]);
     if (options === undefined && this.#ensured.has(resource)) return;
     const db = this.#require();
     if (options !== undefined) {

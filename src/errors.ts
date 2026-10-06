@@ -32,6 +32,7 @@ export type ErrorCode =
   | "FIXTURE_NONCONFORMING"
   | "GENERATION_REFUSED"
   | "STORE_SCHEMA_CONFLICT"
+  | "RESERVED_TABLE_NAME"
   | "INIT_CONFLICT";
 
 function describe(value: unknown): string {
@@ -261,6 +262,30 @@ export class AmbiguousSelectionError extends UnderstudyError {
 export class StoreSchemaConflictError extends UnderstudyError {
   constructor(resource: string, detail: string) {
     super("STORE_SCHEMA_CONFLICT", `cannot change the stored shape of ${resource}: ${detail}`, resource);
+  }
+}
+
+
+/**
+ * A derived resource's name is exactly one of the tool's own table names (`_understudy_meta`,
+ * `_requests`, `_id_ranges`). The resource's table would collide with a table the tool manages,
+ * so the mock refuses to start — naming the colliding collection and the reserved table — rather
+ * than failing later inside the driver with an opaque constraint error (constitution VI).
+ *
+ * Reserved by *exact name*, never by a `_` prefix: a document may legitimately name a collection
+ * `_events` (`_event`), which is not reserved.
+ */
+export class ReservedTableNameError extends UnderstudyError {
+  readonly resource: string;
+  readonly table: string;
+  constructor(resource: string, table: string, reserved: readonly string[]) {
+    super(
+      "RESERVED_TABLE_NAME",
+      `the collection ${resource} would create a table named ${table}, which is reserved by the tool for its own use (reserved: ${[...reserved].join(", ")}); rename the collection or its schema title`,
+      resource,
+    );
+    this.resource = resource;
+    this.table = table;
   }
 }
 
