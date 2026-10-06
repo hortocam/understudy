@@ -935,3 +935,23 @@ nowhere.
   (`cascade-removes-fixtures`).
 - **Not done here (by design):** T087 — the coordinator re-runs `test:live` against the real
   document and commits `live-derivation-run.md`.
+
+## Post-merge records (coordinator, 2026-10-06) — the parked deck, drained
+
+The slice merged at `83c9737` (PR #20). Before slice 3 begins, the non-blocking deck carried out of
+the slice-1/slice-2 reviews was cleared, per the standing policy that deferrals be resolved before
+the next slice. This section records the **spec-side** items done on the merged revision; the
+code-side items are tracked on their own board cards.
+
+- **`@faker-js/faker` pin recorded.** `plan.md` pinned `^9`; the implementation used `^10.6.0` and was
+  right to (the advisory that forced it). `plan.md` now carries an amendment and its *Why*.
+- **`_requests.live` defined.** The column's two clauses were contradictory for a *selected but
+  unbound* operation (T050). `data-model.md` §5 records the decision (the behavioural clause wins)
+  and slice 1's comment is corrected to match. No requirement changes.
+- **Quickstart corrections.** `001-slice-1-core/quickstart.md` §3 now states the stop-the-instance
+  expectation and the pipe-buffering behaviour of the report probe; §9 records the runtime identity
+  counter's real behaviour (persists across restart, rewinds on wipe — **corrected** from the review
+  note, which had the wipe/restart effects the wrong way round; measured, not assumed).
+- **Constitution amendment XI (v1.1.0) + `demo.md` for slices 1 and 2.** Every phase and slice now
+  ships a runnable human demo, written from a real run of the merged revision. See
+  `specs/001-slice-1-core/demo.md` and `specs/002-data-layer/demo.md`.

@@ -100,6 +100,32 @@ every version.
 *Rationale:* the delivery slices are sequenced deliberately; a seam added after the fact is a
 refactor of shipped behaviour, which is exactly the cost this sequencing avoids.
 
+### XI. Every Unit of Work Ships a Runnable Demo
+
+Every phase and every delivery slice MUST ship a short, **runnable** walkthrough that a person can
+follow — on their own machine, against a built checkout — to exercise each of the unit's tasks and
+see the change for themselves. It lives beside the spec as `specs/<feature>/demo.md`: a cycle
+through the real CLI/API, not a QA checklist and not a description of the tests.
+
+- It MUST be **executable as written**: verbatim commands, each with its **observable** expected
+  outcome (a status code, a printed line, an exit status) — never "it works".
+- It MUST exercise **each phase** of its unit, so a reader can trace every task to something they
+  saw happen.
+- It MUST carry a **negative control** wherever the behaviour is a refusal, a guard or an
+  invariant: a step showing the wrong input being rejected, so a green run cannot be mistaken for
+  a mock that fails open.
+- Its expected outcomes are the **committed surface** of the unit. A demo that reads a field the
+  API does not serve, or quotes a message the code does not print, is a defect in the demo — and
+  it is updated in the same change that changes what it shows.
+- It is the **human checkpoint's script**: the owner (or the reviewer) runs it to accept the unit,
+  and the unit is not "done" until it runs as written on the merged revision.
+
+*Rationale:* a spec says what a unit should do and a test says the code agrees with itself; neither
+lets a person *see* the behaviour and build their own mental model of it. A demo the owner can run
+is how the owner keeps first-hand familiarity with the product as it grows, and how manual
+validation differs from trusting a green suite. A demo written from the code but never run is a
+second description that rots — so it is executed as written before the unit is complete.
+
 ## Additional Constraints
 
 - **Stack.** TypeScript on Node.js 22+, ES modules. HTTP: Fastify (mock surface and control
@@ -127,6 +153,9 @@ refactor of shipped behaviour, which is exactly the cost this sequencing avoids.
   the `test` status check required and strict, `enforce_admins` on, force pushes and deletions
   off. Every change to `main` arrives as a merged pull request.
 - **TDD.** Red before green, per Principle VII. Test and implementation land in the same change.
+- **Every unit ships a runnable demo.** A phase or slice is not complete until `specs/<feature>/demo.md`
+  runs as written on the merged revision (Principle XI): verbatim commands, observable outcomes,
+  every phase exercised, a negative control for each guard.
 - **Independent review.** The reviewer MUST come from a **different model lineage** than the
   author. The reviewer runs a Spec Kit converge cycle against the delivered branch and opens the
   pull request only when converge comes back clean.
@@ -157,4 +186,28 @@ Where a conflict exists, this document wins and the other artefact is corrected.
   holds the feature specifications that refine it; `.specify/memory/constitution.md` is this
   document and the only authoritative copy.
 
-**Version**: 1.0.0 | **Ratified**: 2026-10-03 | **Last Amended**: 2026-10-03
+**Version**: 1.1.0 | **Ratified**: 2026-10-03 | **Last Amended**: 2026-10-06
+
+## Amendment 2026-10-06 — XI: Every Unit of Work Ships a Runnable Demo
+
+**Why.** The owner asked for it directly, after slice 2 completed: they want, for every phase and
+slice going forward, "a set of steps a human can follow to see the changes and verify" — "just a
+cycle through the CLI steps and commands that will exercise each of the tasks", so that they can
+(A) stay familiar with how the tool is actually used and (B) manually validate each unit before it
+is accepted. The spec and the automated suite answer "is it correct?"; they do not let a person
+*see* the behaviour or build a mental model of it. This makes the demo a first-class deliverable
+rather than something a developer writes ad hoc.
+
+**What changes.** Adds Principle XI and a workflow bullet ("Every unit ships a runnable demo"). New
+documentation artefact per feature, `specs/<feature>/demo.md`, plus a `.specify/templates/
+demo-template.md` so the Spec Kit tasks step carries it. Nothing existing is redefined: the demo is
+**additive** to the human checkpoint that already gates each spec and plan, and it neither replaces
+nor weakens the tests (VII) or the review gate.
+
+**Scope note (governance).** The rule is adopted by the owner's approval, per "Governance →
+Adoption". Applying it retroactively is deliberately bounded: slices 1 and 2 are backfilled with a
+`demo.md` each, written **from a real run** of the merged revision, because they merged before the
+rule existed. Every unit that starts after this amendment carries a `demo.md` as a normal task.
+
+**Not a redefinition.** MINOR bump, not MAJOR: no principle is removed or redefined; a principle is
+added and guidance expanded.

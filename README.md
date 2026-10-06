@@ -68,7 +68,68 @@ ustdy down
 ```
 
 The full runnable walkthrough — every step with its expected output — is
-[`specs/001-slice-1-core/quickstart.md`](specs/001-slice-1-core/quickstart.md).
+[`specs/001-slice-1-core/quickstart.md`](specs/001-slice-1-core/quickstart.md). For a demo that shows
+the data layer (fixtures, recipes, generation, determinism), see
+[`specs/002-data-layer/demo.md`](specs/002-data-layer/demo.md).
+
+## Run it, see it — the per-unit demo
+
+Every phase and every slice ships a **runnable demo** at `specs/<feature>/demo.md`: a cycle through
+the real CLI/API, with verbatim commands and their observable results, that exercises each task in
+the unit (**constitution principle XI**). It is the script for the human checkpoint — run it to see
+the behaviour for yourself, rather than trusting a green suite.
+
+| Unit | Demo | What it shows |
+|---|---|---|
+| Slice 1 — core CRUD mock | [`specs/001-slice-1-core/demo.md`](specs/001-slice-1-core/demo.md) | start + report, CRUD across a restart, the distinct 501, document-owned validation, the control plane and the CLI as its client, instance isolation, a loud refusal |
+| Slice 2 — data layer I | [`specs/002-data-layer/demo.md`](specs/002-data-layer/demo.md) | `init` scaffolding, fixtures fixed forever, deterministic and independent generation, non-colliding identities, invariant enforcement, the validated-but-unrun behaviour layer, applying a recipe to a running mock |
+
+A demo is written from a **real run** of the merged revision and re-run before the unit is accepted,
+so no step in one of these files is aspirational.
+
+## Setup
+
+A checkout is self-contained: Node.js 22+, `npm ci`, `npm run build`. There is nothing else to
+install and no service to stand up first — the mock is the service.
+
+```bash
+git clone https://github.com/hortocam/understudy.git
+cd understudy
+npm ci                 # Node 22+; installs from the lockfile
+npm run build          # tsc -p tsconfig.build.json (runs `generate` first)
+node dist/cli/index.js --help
+```
+
+`ustdy` is the CLI binary declared in `package.json` (`bin: { ustdy: dist/cli/index.js }`). If you
+want the bare `ustdy` name on your `PATH` rather than typing `node dist/cli/index.js`:
+
+```bash
+npm link               # or: npm i -g .   /  alias ustdy="node $(pwd)/dist/cli/index.js"
+```
+
+Everything the tool does is reachable over the control API; the CLI is a thin client of it
+(constitution II). `up` constructs and starts the server from a config and polls `/health` until
+ready; `init` writes files; **every other command is one control request** and fails with a clear
+connection error if the control plane is unreachable, rather than doing the work locally.
+
+### Running a project from elsewhere
+
+`spec` is resolved **relative to the config file**, so a project directory can live anywhere and
+point back at this checkout's fixtures:
+
+```bash
+mkdir -p /tmp/my-mock && cd /tmp/my-mock
+cat > understudy.yaml <<'YAML'
+spec: /path/to/understudy/tests/fixtures/inventory-api.yaml
+operations: [GET /inventory, POST /inventory, GET /inventory/{id}]
+server:  { port: 8080 }
+storage: { driver: sqlite, path: ./.understudy/state.db }
+YAML
+node /path/to/understudy/dist/cli/index.js up --config ./understudy.yaml
+```
+
+Two instances run side by side only with **distinct ports and distinct store files** — a shared
+store file is shared state, not isolation.
 
 ## CLI (`ustdy`)
 
