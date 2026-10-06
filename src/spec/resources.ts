@@ -324,10 +324,19 @@ function disambiguateNames(resources: Resource[], ambiguities: Ambiguity[]): voi
     // Capture the colliding names BEFORE renaming — the report names the originals the document
     // declared, never the names this function chose.
     const originalNames = group.map((resource) => resource.name);
-    // The collision's human-facing subject: the shared exact name for an exact duplicate, else the
-    // folded key when the colliding names differ only by case.
-    const exactDuplicate = originalNames.every((name) => name === originalNames[0]);
-    const sharedName = exactDuplicate ? (originalNames[0] as string) : key;
+    // The collision's human-facing subject, and how the lead reads. Three shapes, because a fold
+    // group is not always "collides only by case":
+    //   - pure exact duplicate (Order, Order): every member declares the SAME name — lead with it;
+    //   - pure case group (Foo, foo): no two members share an exact name — key by the folded name;
+    //   - mixed (Widget, Widget, widget): an exact pair IS present, so the group is exact at heart
+    //     and must lead with the shared exact name — never claim it collides "only" by case — while
+    //     still surfacing the fold key so the case variant is visible.
+    const counts = new Map<string, number>();
+    for (const name of originalNames) counts.set(name, (counts.get(name) ?? 0) + 1);
+    const exactShared = [...counts.entries()].find(([, count]) => count > 1)?.[0];
+    const exactCount = exactShared !== undefined ? (counts.get(exactShared) as number) : 0;
+    const pureExact = exactShared !== undefined && counts.size === 1;
+    const subject = exactShared ?? key;
     const renamed: string[] = [];
     for (const resource of group) {
       const base = qualifiedName(resource.collectionPath) || resource.name;
@@ -343,13 +352,15 @@ function disambiguateNames(resources: Resource[], ambiguities: Ambiguity[]): voi
       resource.name = candidate;
       renamed.push(`${resource.collectionPath} → ${candidate}`);
     }
-    const lead = exactDuplicate
-      ? `${group.length} distinct collections would all be named ${sharedName}`
-      : `${group.length} distinct collections have names that collide only by case (${originalNames.join(", ")})`;
+    const lead = pureExact
+      ? `${group.length} distinct collections would all be named ${subject}`
+      : exactShared !== undefined
+        ? `${exactCount} distinct collections would all be named ${exactShared}; ${group.length - exactCount} more differ from it only by case (declared names ${originalNames.join(", ")}; folded key ${key})`
+        : `${group.length} distinct collections have names that collide only by case (${originalNames.join(", ")})`;
     ambiguities.push({
       kind: "duplicate-resource-name",
       path: group[0]?.collectionPath ?? "",
-      subject: sharedName,
+      subject,
       detail: `${lead} (${group.map((r) => r.collectionPath).join(", ")}); each was given a path-qualified name (${renamed.join("; ")}) — pin a schema title or rename them in the document to choose`,
     });
   }

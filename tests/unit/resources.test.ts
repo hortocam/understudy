@@ -186,7 +186,11 @@ describe("names that differ only by case (the same fusion one fold away)", () =>
     const model = await derive();
     const reported = model.ambiguities.filter((ambiguity) => ambiguity.kind === "duplicate-resource-name");
     expect(reported).toHaveLength(1);
+    // A PURE case group (no exact duplicate) is subject-keyed by the folded name and keeps the
+    // "collide only by case" wording — the scope guard for the mixed-group fix below.
+    expect(reported[0]?.subject).toBe("foo");
     const detail = reported[0]?.detail ?? "";
+    expect(detail).toContain("collide only by case");
     expect(detail).toContain("/foos");
     expect(detail).toContain("/bars");
     // The report names the ORIGINAL colliding names the document declared (`Foo`, `foo`)...
@@ -197,6 +201,62 @@ describe("names that differ only by case (the same fusion one fold away)", () =>
     // The original names are not the chosen ones, so the collision is what is named, not the fix.
     expect(model.resources.map((r) => r.name)).not.toContain("Foo");
     expect(model.resources.map((r) => r.name)).not.toContain("foo");
+  });
+
+  it("is deterministic regardless of path order", async () => {
+    const a = (await derive()).resources.map((r) => `${r.collectionPath}=${r.name}`).sort();
+    const b = (await derive()).resources.map((r) => `${r.collectionPath}=${r.name}`).sort();
+    expect(a).toEqual(b);
+  });
+});
+
+describe("a fold group mixing an exact duplicate with a case variant", () => {
+  // Titles `Widget` (/widgets), `Widget` (/gadgets) and `widget` (/doohickeys) — one fold group
+  // whose members do NOT all differ "only by case": two declare the exact same name, so the
+  // report must lead with that exact-duplicate fact, not claim a pure case collision.
+  /** ASCII-only lower-case, the fold SQLite applies to table identity (`sqlite3_stricmp`). */
+  const fold = (name: string): string => name.replace(/[A-Z]/g, (char) => char.toLowerCase());
+
+  async function derive() {
+    const loaded = await loadSpec(fixture("mixed-name-fold-api.yaml"));
+    const live = collectOperations(loaded.document);
+    return deriveModel(loaded.document, live, {});
+  }
+
+  it("renames every member so no two names fold together, and reports the group once", async () => {
+    const model = await derive();
+    expect(model.resources.map((r) => r.collectionPath).sort()).toEqual(["/doohickeys", "/gadgets", "/widgets"]);
+    const folded = model.resources.map((r) => fold(r.name));
+    expect(new Set(folded).size).toBe(folded.length);
+    expect(model.ambiguities.filter((a) => a.kind === "duplicate-resource-name")).toHaveLength(1);
+  });
+
+  it("subjects the report by the shared EXACT name, not the folded key", async () => {
+    const model = await derive();
+    const reported = model.ambiguities.filter((a) => a.kind === "duplicate-resource-name");
+    // `Widget` is declared twice; the folded key is `widget`.
+    expect(reported[0]?.subject).toBe("Widget");
+  });
+
+  it("leads with the exact-duplicate fact, never claiming the names collide only by case", async () => {
+    const model = await derive();
+    const detail = model.ambiguities.find((a) => a.kind === "duplicate-resource-name")?.detail ?? "";
+    // The exact-duplicate pair leads; the lead is about the exact shared name, not the fold.
+    expect(detail).toContain("would all be named Widget");
+    expect(detail).not.toContain("collide only by case");
+    // The case variant is surfaced as an aside, and the declared names are all listed.
+    expect(detail).toContain("differ from it only by case");
+    expect(detail).toContain("widget");
+    expect(detail).toContain("folded key widget");
+  });
+
+  it("still names every original, every path and every chosen name", async () => {
+    const model = await derive();
+    const detail = model.ambiguities.find((a) => a.kind === "duplicate-resource-name")?.detail ?? "";
+    for (const path of ["/widgets", "/gadgets", "/doohickeys"]) expect(detail).toContain(path);
+    expect(detail).toContain("Widget");
+    expect(detail).toContain("widget");
+    for (const resource of model.resources) expect(detail).toContain(resource.name);
   });
 
   it("is deterministic regardless of path order", async () => {

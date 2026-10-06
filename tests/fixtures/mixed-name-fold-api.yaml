@@ -1,0 +1,97 @@
+openapi: 3.1.0
+info:
+  title: Mixed Name Fold API
+  version: 1.0.0
+  description: >
+    Follow-up fixture (t_5ed08bfb). ONE case-fold group that MIXES an exact duplicate with a case
+    variant: three distinct collections whose representation titles are `Widget` (/widgets),
+    `Widget` (/gadgets) and `widget` (/doohickeys). All three fold to SQLite's table-identity key
+    `widget`, so all three are renamed; the report must lead with the exact-duplicate fact (`Widget`
+    is shared by two collections) rather than claiming they collide "only by case".
+paths:
+  /widgets:
+    get:
+      operationId: listWidgets
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/WidgetA" }
+  /widgets/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+    get:
+      operationId: getWidget
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WidgetA" }
+  /gadgets:
+    get:
+      operationId: listGadgets
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/WidgetB" }
+  /gadgets/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+    get:
+      operationId: getGadget
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WidgetB" }
+  /doohickeys:
+    get:
+      operationId: listDoohickeys
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/WidgetC" }
+  /doohickeys/{id}:
+    parameters: [{ name: id, in: path, required: true, schema: { type: integer } }]
+    get:
+      operationId: getDoohickey
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WidgetC" }
+components:
+  schemas:
+    WidgetA:
+      title: Widget
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+    WidgetB:
+      title: Widget
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+    WidgetC:
+      title: widget
+      type: object
+      required: [id, label]
+      properties:
+        id: { type: integer }
+        label: { type: string }
