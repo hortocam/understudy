@@ -1,0 +1,113 @@
+openapi: 3.1.0
+info:
+  title: Case Collision API
+  version: 1.0.0
+  description: >
+    FU case-collision fixture. Two distinct collections whose representation titles differ only
+    by case — `Foo` on `/foos` and `foo` on `/bars`. SQLite compares table identifiers
+    case-insensitively (ASCII), so before the fix both resources were named and each table
+    `CREATE TABLE IF NOT EXISTS` silently resolved to the SAME physical table, fusing rows:
+    a record POSTed to `/foos` came back from `GET /bars`. Distinct paths, distinct rows.
+paths:
+  /foos:
+    get:
+      operationId: listFoos
+      parameters:
+        - { name: limit, in: query, required: false, schema: { type: integer } }
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Foo" }
+    post:
+      operationId: createFoo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FooCreate" }
+      responses:
+        "201":
+          description: created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Foo" }
+  /foos/{id}:
+    get:
+      operationId: getFoo
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Foo" }
+  /bars:
+    get:
+      operationId: listBars
+      parameters:
+        - { name: limit, in: query, required: false, schema: { type: integer } }
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Bar" }
+    post:
+      operationId: createBar
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BarCreate" }
+      responses:
+        "201":
+          description: created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Bar" }
+  /bars/{id}:
+    get:
+      operationId: getBar
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Bar" }
+components:
+  schemas:
+    Foo:
+      title: Foo
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+    FooCreate:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name: { type: string }
+    Bar:
+      title: foo
+      type: object
+      required: [id, label]
+      properties:
+        id: { type: integer }
+        label: { type: string }
+    BarCreate:
+      type: object
+      additionalProperties: false
+      required: [label]
+      properties:
+        label: { type: string }

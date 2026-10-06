@@ -289,44 +289,68 @@ function qualifiedName(collectionPath: string): string {
 }
 
 /**
+ * The key SQLite uses for table identity. `sqlite3_stricmp` folds ASCII letters only, so two
+ * resource names that differ just by ASCII case (`Foo` / `foo`) address the SAME physical table;
+ * a non-ASCII pair (`Café` / `CAFÉ`) stays distinct under SQLite and under this fold.
+ */
+function foldName(name: string): string {
+  return name.replace(/[A-Z]/g, (char) => char.toLowerCase());
+}
+
+/**
  * Two distinct collections must never share a name: the store, identity spaces, plan and config
- * are all keyed by it, so a shared name would fuse them silently. Every colliding resource is
- * renamed to a path-qualified, deterministic name (none keeps the bare name, so nothing quietly
- * "wins"), and the collision is reported with the colliding paths (FR-007).
+ * are all keyed by it, so a shared name would fuse them silently. An exact duplicate and a
+ * case-folded collision (`Foo` / `foo`) are the *same* defect — SQLite compares table identifiers
+ * case-insensitively, so both would share one physical table — so both are handled here. Every
+ * colliding resource is renamed to a path-qualified, deterministic name (none keeps a name that
+ * folds into the collision key, so nothing quietly "wins"), and the collision is reported with the
+ * colliding paths and the chosen names (FR-007).
  */
 function disambiguateNames(resources: Resource[], ambiguities: Ambiguity[]): void {
-  const byName = new Map<string, Resource[]>();
+  const byFold = new Map<string, Resource[]>();
   for (const resource of resources) {
-    const list = byName.get(resource.name) ?? [];
+    const key = foldName(resource.name);
+    const list = byFold.get(key) ?? [];
     list.push(resource);
-    byName.set(resource.name, list);
+    byFold.set(key, list);
   }
+  // `taken` holds FOLDED names, so a newly chosen name can never fold onto an untouched one.
   const taken = new Set<string>(
-    [...byName.entries()].filter(([, group]) => group.length === 1).map(([name]) => name),
+    [...byFold.entries()].filter(([, group]) => group.length === 1).map(([key]) => key),
   );
-  for (const name of [...byName.keys()].sort()) {
-    const group = (byName.get(name) ?? []).slice().sort((a, b) => a.collectionPath.localeCompare(b.collectionPath));
+  for (const key of [...byFold.keys()].sort()) {
+    const group = (byFold.get(key) ?? []).slice().sort((a, b) => a.collectionPath.localeCompare(b.collectionPath));
     if (group.length < 2) continue;
+    // Capture the colliding names BEFORE renaming — the report names the originals the document
+    // declared, never the names this function chose.
+    const originalNames = group.map((resource) => resource.name);
+    // The collision's human-facing subject: the shared exact name for an exact duplicate, else the
+    // folded key when the colliding names differ only by case.
+    const exactDuplicate = originalNames.every((name) => name === originalNames[0]);
+    const sharedName = exactDuplicate ? (originalNames[0] as string) : key;
     const renamed: string[] = [];
     for (const resource of group) {
-      const base = qualifiedName(resource.collectionPath) || name;
+      const base = qualifiedName(resource.collectionPath) || resource.name;
       let candidate = base;
-      for (let n = 2; taken.has(candidate) || candidate === name; n += 1) candidate = `${base}${n}`;
-      taken.add(candidate);
+      for (let n = 2; taken.has(foldName(candidate)) || foldName(candidate) === key; n += 1) candidate = `${base}${n}`;
+      taken.add(foldName(candidate));
       for (const ambiguity of ambiguities) {
         if (ambiguity.path !== (resource.instancePath ?? resource.collectionPath) && ambiguity.path !== resource.collectionPath) continue;
         if (ambiguity.kind === "duplicate-resource-name") continue;
-        if (ambiguity.subject === name) ambiguity.subject = candidate;
-        ambiguity.detail = ambiguity.detail.split(name).join(candidate);
+        if (ambiguity.subject === resource.name) ambiguity.subject = candidate;
+        ambiguity.detail = ambiguity.detail.split(resource.name).join(candidate);
       }
       resource.name = candidate;
       renamed.push(`${resource.collectionPath} → ${candidate}`);
     }
+    const lead = exactDuplicate
+      ? `${group.length} distinct collections would all be named ${sharedName}`
+      : `${group.length} distinct collections have names that collide only by case (${originalNames.join(", ")})`;
     ambiguities.push({
       kind: "duplicate-resource-name",
       path: group[0]?.collectionPath ?? "",
-      subject: name,
-      detail: `${group.length} distinct collections would all be named ${name} (${group.map((r) => r.collectionPath).join(", ")}); each was given a path-qualified name (${renamed.join("; ")}) — pin a schema title or rename them in the document to choose`,
+      subject: sharedName,
+      detail: `${lead} (${group.map((r) => r.collectionPath).join(", ")}); each was given a path-qualified name (${renamed.join("; ")}) — pin a schema title or rename them in the document to choose`,
     });
   }
 }
