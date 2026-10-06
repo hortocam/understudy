@@ -31,7 +31,7 @@ unchanged from slice 1, because this slice extends the same modules rather than 
 
 | Concern | Choice | Version | Note |
 |---|---|---|---|
-| Plausible-value generation | `@faker-js/faker` | ^9 | seeded; the constitution's named choice. Used only at precedence level 5 |
+| Plausible-value generation | `@faker-js/faker` | ^10.6 | seeded; the constitution's named choice. Used only at precedence level 5. **Amended 2026-10-06 — see the amendment below: this plan originally pinned `^9`, and the implementation correctly used `^10.6.0`.** |
 | Expressions / calc rules | `jsonata` | ^2 | constitution names JSONata; the recipe `expr` rule is JSONata with seeding-aware helper functions registered into the environment |
 | HTTP / validation / storage / config / CLI / test | unchanged from slice 1 | — | `fastify` ^5.12, `ajv`(+`ajv-formats`) ^8.20/^3, `better-sqlite3` ^13, `yaml` ^2, `commander` ^15, `vitest` ^5 |
 
@@ -214,3 +214,25 @@ slice derives the *population*, and its rules are stated against the measured ve
 | `jsonata` as the expression engine, with seeding-aware `$`-helpers registered | The constitution names JSONata; recipes need a calc rule over sibling fields (FR-011) and seeded draws like `$uniform` | A bespoke expression parser is a second, worse language; baking randomness into generators only would make FR-011's "calculation over the record's own sibling fields" impossible to express |
 | Four separate config layers rather than one settings file | The layers have different lifetimes and different consumers (FR-001) | One file would load behaviour config in slice 2 and give it nowhere to be consumed until slice 4 — exactly the "parsed but inert" state the spec bounds explicitly |
 | Reserved ranges spanning multiple identity spaces | FR-017 as amended; the target document mixes integer/uuid/prefixed identities | An integer-only reservation silently collides on a uuid or prefixed identity, which is the failure SC-006 exists to prevent |
+
+## Amendment 2026-10-06 — `@faker-js/faker` pinned at ^10.6, not ^9
+
+**What the plan said.** ^9 (the Technical Context table above).
+
+**What was implemented.** ^10.6.0.
+
+**Why the implementation is right.** Every `9.x` release **and** every `10.x ≤ 10.4` carries a
+high-severity advisory — GHSA-qxc2-j82w-r537, arbitrary code execution via `helpers.fake` — and
+slice 2's T001 requires "`npm audit` reports no new advisories". Staying on `^9` would mean shipping
+a known-vulnerable dependency, which the plan's own acceptance condition forbids. `10.6` keeps the
+exact seeded API the design depends on: `new Faker({ locale, randomizer })`, `setDefaultRefDate` and
+`generateMersenne53Randomizer`, all verified by the T001 toolchain smoke test.
+
+**Why the record is being amended now, not left in the PR.** This is a real deviation from an
+**approved** artefact, reasoned in the implementation notes and the merged PR, but the plan itself
+was never amended. Constitution Governance says amendments **extend** the document so the reasoning
+travels with the rule — and a plan that still reads `^9` will, on a future slice, invite a "correcting"
+edit that reintroduces the advisory. The plan is corrected here to carry the decision and its *Why*.
+
+**No code change.** Recorded for the same reason the decision was made: a reader of the approved plan
+must be able to see why the dependency departs from it.

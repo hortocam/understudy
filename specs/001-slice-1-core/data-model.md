@@ -100,7 +100,7 @@ CREATE TABLE _requests (
   method      TEXT NOT NULL,
   path        TEXT NOT NULL,     -- the concrete path, as received
   status      INTEGER NOT NULL,
-  live        INTEGER NOT NULL,  -- 1 if the operation was selected, 0 if it answered 501
+  live        INTEGER NOT NULL,  -- 1 if the mock's CRUD served the request, 0 if the answer was a 501
   duration_ms INTEGER NOT NULL
 );
 CREATE INDEX _requests_at_idx ON _requests (at);

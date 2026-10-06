@@ -69,6 +69,15 @@ node dist/cli/index.js up --config ./understudy.yaml 2>&1 | \
   && echo "SC-006: report carries the live set"
 ```
 
+**Two things to expect from that probe** (it is a probe, not a start):
+
+1. `up` **blocks** — it serves until it is torn down. The line above only returns because `head -1`
+   closes the pipe once it has its line; expect the instance to be stopped by the time the command
+   prints. If you want it to stay up, start it without the pipe.
+2. Piping into `head` **buffers**: without `set -o pipefail` a failure upstream can be masked behind
+   a `jq` that then reads nothing. If the command prints no `SC-006` line, run `up` on its own first
+   and read the report by eye before suspecting the report.
+
 ## 4. Prove CRUD persists across a restart (SC-002, FR-010)
 
 ```bash
@@ -152,6 +161,19 @@ curl -s localhost:8081/inventory     # EMPTY []: no cross-talk between instances
 
 **Expected**: the second instance answers `[]` — the record created on 8080 is not visible on
 8081, because each instance has its own store file.
+
+**A note on the identity you will see.** The create above allocates `100000` only on a *virgin*
+store. The runtime identity counter lives in the store (`_understudy_meta`), so the value depends on
+the store's history:
+
+| Sequence | Next create id |
+|---|---|
+| `rm -rf .understudy`, then create | `100000` |
+| create, then `up`/`down`/`up` **without** a wipe, then create | `100001` — the counter survived the restart |
+| create, then `ustdy reset --to wipe`, then create | `100000` — a wipe rewinds the counter |
+
+That is deliberate (T032): a wiped mock starts counting again where it began. Do not read `100000`
+as a fixed constant — on a non-virgin store the first create allocates a higher id.
 
 ## 10. Prove no hidden outbound calls (SC-008, FR-022)
 

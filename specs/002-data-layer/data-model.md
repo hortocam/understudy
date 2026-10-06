@@ -174,3 +174,20 @@ would be noise") — it arrives here, where relationships become concrete.
 | Action/reaction/simulation state | behaviour is validated, not run | slice 5 |
 | A virtual clock's state, a Postgres adapter | the **seam** lands now, the implementation does not | slice 6 |
 | `_subscriptions` (consumer-created) | deferred feature (E7) | slice 6 |
+
+## 5. Clarifications recorded during implementation
+
+### `_requests.live` — which clause wins
+
+Slice 1's `data-model.md` §2 documented the column as "1 if the operation was selected, 0 if it
+answered 501". Those two clauses were written when "a selected operation never answers 501" was
+assumed — true until slice 2's convergence task T050 introduced a *selected* operation the derived
+model cannot bind (a route with no resource), which answers `NOT_IMPLEMENTED` (501) instead of a
+silent empty 2xx. Such a request is **selected** (clause 1 → `live=1`) *and* **answered 501**
+(clause 2 → `live=0`): the frozen document supported two contradictory readings.
+
+**Decision of record: the behavioural clause wins.** `live` means "did the mock's CRUD serve this
+request?", so a *selected but unbound* operation is recorded `live=0`, exactly as the implementation
+does. This is the reading the log's only consumer needs ("which requests hit real CRUD?"), and it is
+consistent with the `live` query filter on `GET /requests`. The slice-1 comment has been corrected to
+this wording in the same change. No requirement, schema or behaviour changes.

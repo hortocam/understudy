@@ -157,6 +157,10 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] TXXX [P] Additional unit tests (if requested) in tests/unit/
 - [ ] TXXX Security hardening
 - [ ] TXXX Run quickstart.md validation
+- [ ] TXXX Author `specs/<feature>/demo.md` from `.specify/templates/demo-template.md` and **run it
+      as written** against the built checkout: verbatim commands, observable outcomes, every phase
+      exercised, a negative control for each guard. Constitution principle XI — the unit is not done
+      until the demo runs as written on the merged revision.
 
 ---
 
