@@ -200,6 +200,12 @@ function resolveSpec(spec: string, configDir: string): string {
   return resolve(configDir, spec);
 }
 
+/** Resolve a relative `storage.path` against the config file's directory, as `spec` is. */
+function resolveStoragePath(path: string, configDir: string): string {
+  if (isAbsolute(path)) return path;
+  return resolve(configDir, path);
+}
+
 /** Fill the documented `onDelete: restrict` default on every pinned relation. */
 function normaliseEntities(entities: Record<string, EntityConfig>): Record<string, EntityConfig> {
   const out: Record<string, EntityConfig> = {};
@@ -247,6 +253,7 @@ export function parseConfig(text: string, source: string): UnderstudyConfig {
   return {
     ...config,
     spec: resolveSpec(config.spec, baseDir),
+    storage: { ...config.storage, path: resolveStoragePath(config.storage.path, baseDir) },
     baseDir,
     paths: {
       static: resolve(baseDir, rawPaths.static),

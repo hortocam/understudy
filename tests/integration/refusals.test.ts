@@ -19,7 +19,7 @@ import { runCli, type CliIo } from "../../src/cli/program.js";
 import { parseConfig } from "../../src/config/load.js";
 import { EmptySelectionError } from "../../src/errors.js";
 import { createMock } from "../../src/index.js";
-import { renderRefusal } from "../../src/logging.js";
+import { createLogger, renderRefusal } from "../../src/logging.js";
 import { fixturePath } from "../helpers/mock.js";
 
 let occupied: ReturnType<typeof createServer> | undefined;
@@ -141,6 +141,60 @@ describe("refusal paths (FR-004, FR-024): each names its cause and exits non-zer
     expect(result.all).toContain("refusing to start");
     expect(result.all).toContain("GET /nope");
     expect(result.all).toContain("does not contain");
+  });
+
+  it("renders the refusal exactly once, at the process boundary, and on stderr", async () => {
+    // FU: `createMock` used to render the refusal to its report sink AND the CLI printed a bare
+    // `ustdy: <cause>`, so one refusal reached the terminal as three lines. The human rendering is
+    // now emitted once, by the process boundary (the CLI), on the error channel.
+    const dir = tmp();
+    const rendered = (text: string): number =>
+      text.split("\n").filter((line) => line.startsWith("understudy: refusing to start:")).length;
+    const bare = (text: string): number =>
+      text.split("\n").filter((line) => line.startsWith("ustdy: ")).length;
+
+    // (a) the refusal the config loader raises (before `createMock` is even reached) …
+    const badConfig = await up(
+      writeConfig(dir, [
+        `spec: ${fixturePath("inventory-api.yaml")}`,
+        "operations: [GET /inventory]",
+        "bogus: true",
+        `storage: { driver: sqlite, path: ${JSON.stringify(join(dir, "state.db"))} }`,
+      ]),
+    );
+    expect(rendered(badConfig.stderr)).toBe(1);
+    expect(rendered(badConfig.stdout)).toBe(0);
+    expect(bare(badConfig.stderr)).toBe(0);
+
+    // (b) … and the refusal `createMock` raises (the engine's own guard).
+    const fromMock = await up(configFor(fixturePath("inventory-api.yaml"), ["GET /nope"], dir));
+    expect(rendered(fromMock.stderr)).toBe(1);
+    expect(rendered(fromMock.stdout)).toBe(0);
+    expect(bare(fromMock.stderr)).toBe(0);
+  });
+
+  it("a library refusal writes the structured log line, not the human rendering (FR-024)", async () => {
+    // The deliberate split: `createMock` emits ONE structured log line (machine-readable, kept) and
+    // does NOT write the human rendering to its `out` sink — the boundary does that, once.
+    const dir = tmp();
+    const config = { ...parseConfig(`spec: ${fixturePath("inventory-api.yaml")}\noperations: [GET /inventory]\n`, join(dir, "c.yaml")), operations: [] };
+    const logs: string[] = [];
+    const out: string[] = [];
+    const thrown = await createMock(config, {
+      port: 0,
+      out: (text: string) => out.push(text),
+      logger: createLogger({ write: (line: string) => logs.push(line) }),
+    }).catch((error: unknown) => error);
+    expect(thrown).toBeInstanceOf(EmptySelectionError);
+
+    // Exactly one structured error line, and it names the cause (FR-024's machine-readable half).
+    expect(logs).toHaveLength(1);
+    const record = JSON.parse(logs[0] as string) as { level: string; message: string; error?: string };
+    expect(record.level).toBe("error");
+    expect(record.error).toBe("EMPTY_SELECTION");
+    expect(record.message).toContain("empty");
+    // The human rendering is not this layer's job any more.
+    expect(out.join("\n")).not.toContain("refusing to start");
   });
 
   it("an invalid config — names the offending key", async () => {
